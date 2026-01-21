@@ -1,0 +1,52 @@
+# FinNews - 黄金白银走势分析数据管道
+# Python 3.10+ required
+
+# ========================================
+# Web Scraping & API Clients
+# ========================================
+tavily-python==0.5.0          # Tavily API客户端 - 新闻搜索
+yfinance==0.2.52              # Yahoo Finance数据 - 价格&新闻
+feedparser==6.0.11            # RSS解析 - Kitco/FXStreet
+fredapi==0.5.2                # FRED API - 宏观经济数据
+alpha-vantage==2.3.1          # Alpha Vantage (备选)
+requests==2.32.3              # HTTP请求
+beautifulsoup4==4.12.3        # HTML解析
+lxml==5.3.0                   # XML解析器(feedparser依赖)
+
+# ========================================
+# Data Processing
+# ========================================
+pandas==2.2.3                 # 数据处理
+numpy==2.0.2                  # 数值计算
+python-dateutil==2.9.0        # 日期处理
+
+# ========================================
+# Scheduling & Storage
+# ========================================
+APScheduler==3.10.4           # 定时任务调度
+# sqlalchemy==2.0.36          # 数据库ORM(可选扩展)
+
+# ========================================
+# Utilities
+# ========================================
+python-dotenv==1.0.1          # 环境变量管理
+pyyaml==6.0.2                 # YAML配置支持
+pytz==2024.2                  # 时区处理
+
+# ========================================
+# Logging & Monitoring
+# ========================================
+colorlog==6.9.0               # 彩色日志输出
+tqdm==4.67.1                  # 进度条显示
+
+# ========================================
+# Network Optimization (yfinance优化)
+# ========================================
+curl-cffi==0.7.3              # Session复用优化
+
+# ========================================
+# Optional: Advanced Features
+# ========================================
+# transformers==4.48.0        # FinBERT情感分析
+# vaderSentiment==3.3.2       # VADER情感分析
+# streamlit==1.40.2           # 可视化仪表板
