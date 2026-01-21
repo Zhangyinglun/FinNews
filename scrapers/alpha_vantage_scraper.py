@@ -71,4 +71,13 @@ class AlphaVantageScraper(BaseScraper):
         except Exception as e:
             self.logger.error(f"Alpha Vantage抓取失败: {e}")
 
-        return all_data
+        # 应用时间窗口过滤 (12小时)，允许回退到最新数据
+        filtered_data = self._filter_recent_records(
+            all_data,
+            window_hours=Config.FLASH_WINDOW_HOURS,
+            allow_fallback=True,
+            fallback_note="Alpha Vantage数据为每日发布，显示最近一次更新",
+            daily_label="每日发布数据",
+        )
+
+        return filtered_data

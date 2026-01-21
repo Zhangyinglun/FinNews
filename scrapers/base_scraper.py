@@ -5,8 +5,8 @@
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import List, Dict, Any
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 
 
 class BaseScraper(ABC):
@@ -40,7 +40,14 @@ class BaseScraper(ABC):
         pass
 
     def _create_base_record(
-        self, title: str, summary: str, url: str, timestamp: datetime = None
+        self,
+        title: str,
+        summary: str,
+        url: str,
+        timestamp: Optional[datetime] = None,
+        *,
+        record_type: str = "news",
+        fallback_allowed: bool = False,
     ) -> Dict[str, Any]:
         """
         创建标准化数据记录
@@ -50,6 +57,8 @@ class BaseScraper(ABC):
             summary: 摘要
             url: 链接
             timestamp: 发布时间
+            record_type: 记录类型
+            fallback_allowed: 是否允许窗口外回退
 
         Returns:
             标准化数据字典
@@ -62,7 +71,59 @@ class BaseScraper(ABC):
             "timestamp": timestamp or datetime.now(),
             "fetched_at": datetime.now(),
             "impact_tag": None,  # 后续由processor填充
+            "type": record_type,
+            "fallback_allowed": fallback_allowed,
         }
+
+    @staticmethod
+    def _parse_record_timestamp(value: Any) -> datetime:
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value)
+            except Exception:
+                return datetime.now()
+        return datetime.now()
+
+    def _filter_recent_records(
+        self,
+        records: List[Dict[str, Any]],
+        window_hours: int,
+        *,
+        allow_fallback: bool = False,
+        fallback_note: Optional[str] = None,
+        daily_label: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        if not records:
+            return []
+
+        if daily_label:
+            for record in records:
+                record["daily_label"] = daily_label
+
+        cutoff_time = datetime.now() - timedelta(hours=window_hours)
+        recent_records = [
+            record
+            for record in records
+            if self._parse_record_timestamp(record.get("timestamp")) >= cutoff_time
+        ]
+        if recent_records:
+            return recent_records
+
+        if allow_fallback:
+            latest = max(
+                records,
+                key=lambda record: self._parse_record_timestamp(
+                    record.get("timestamp")
+                ),
+            )
+            latest["fallback_allowed"] = True
+            if fallback_note:
+                latest["fallback_note"] = fallback_note
+            return [latest]
+
+        return []
 
     def run(self) -> List[Dict[str, Any]]:
         """

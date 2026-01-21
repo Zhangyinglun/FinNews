@@ -8,6 +8,8 @@ from .yfinance_scraper import YFinanceScraper
 from .rss_scraper import RSSFeedScraper
 from .fred_scraper import FREDScraper
 from .alpha_vantage_scraper import AlphaVantageScraper
+from .etf_scraper import EtfScraper
+from .comex_scraper import ComexScraper
 
 __all__ = [
     "BaseScraper",
@@ -16,4 +18,6 @@ __all__ = [
     "RSSFeedScraper",
     "FREDScraper",
     "AlphaVantageScraper",
+    "EtfScraper",
+    "ComexScraper",
 ]

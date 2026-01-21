@@ -38,23 +38,32 @@ class Config:
     ENABLE_RSS = os.getenv("ENABLE_RSS", "true").lower() == "true"
     ENABLE_FRED = os.getenv("ENABLE_FRED", "true").lower() == "true"
     ENABLE_ALPHA_VANTAGE = os.getenv("ENABLE_ALPHA_VANTAGE", "false").lower() == "true"
+    ENABLE_ETF = os.getenv("ENABLE_ETF", "true").lower() == "true"
+
+    # ========================================
+    # 多时间窗口配置
+    # ========================================
+    FLASH_WINDOW_HOURS = int(os.getenv("FLASH_WINDOW_HOURS", "12"))  # 即时窗口(12小时)
+
+    CYCLE_WINDOW_DAYS = int(os.getenv("CYCLE_WINDOW_DAYS", "7"))  # 周度窗口(7天)
+    TREND_WINDOW_DAYS = int(os.getenv("TREND_WINDOW_DAYS", "30"))  # 月度窗口(30天)
 
     # ========================================
     # RSS订阅源配置
     # ========================================
     RSS_FEEDS = {
-        # Kitco源已失效(404),已移除
-        # "kitco_gold": "https://www.kitco.com/rss/category/news/gold",
-        # "kitco_silver": "https://www.kitco.com/rss/category/news/silver",
-        # "kitco_mining": "https://www.kitco.com/rss/category/mining",
-        # FXStreet的gold和silver源返回相同内容,只保留一个避免重复
+        "kitco_gold": "https://www.kitco.com/rss/KitcoGold.xml",
         "fxstreet_commodities": "https://www.fxstreet.com/rss/news/commodities/gold",
+        "investing_commodities": "https://www.investing.com/rss/commodities.rss",
+        "zerohedge": "http://feeds.feedburner.com/zerohedge/feed",
+        "oilprice": "https://oilprice.com/rss/main",
     }
 
     # ========================================
-    # yfinance监控股票代码
+    # yfinance监控股票代码 (含VIX)
     # ========================================
     YFINANCE_TICKERS = {
+        "vix": "^VIX",  # VIX恐慌指数 (新增)
         "dollar_index": "DX-Y.NYB",  # 美元指数
         "treasury_10y": "^TNX",  # 10年期国债收益率
         "gold_futures": "GC=F",  # 黄金期货
@@ -62,23 +71,75 @@ class Config:
     }
 
     # ========================================
-    # Tavily搜索关键词池
+    # 规则引擎阈值配置
     # ========================================
-    TAVILY_QUERIES = [
-        # 地缘政治
-        "latest geopolitical tension Middle East Russia Ukraine",
-        "global market risk off sentiment safe haven demand",
-        # 货币政策
-        "major central bank interest rate decision updates",
-        "Federal Reserve monetary policy inflation expectations",
-        "ECB BOJ interest rate policy decision",
-        # 宏观经济
-        "US inflation CPI PCE data latest release",
-        "non-farm payroll employment data US economy",
-        "US dollar index DXY strength weakness drivers",
-        # 贵金属特定
-        "gold silver demand central bank purchases",
-        "precious metals market outlook trading",
+    VIX_ALERT_THRESHOLD = float(
+        os.getenv("VIX_ALERT_THRESHOLD", "20")
+    )  # VIX绝对值警戒线
+    VIX_SPIKE_PERCENT = float(os.getenv("VIX_SPIKE_PERCENT", "5"))  # VIX暴涨百分比阈值
+    DXY_CHANGE_THRESHOLD = float(
+        os.getenv("DXY_CHANGE_THRESHOLD", "0.5")
+    )  # DXY显著变化阈值(%)
+    US10Y_CHANGE_THRESHOLD = float(
+        os.getenv("US10Y_CHANGE_THRESHOLD", "2")
+    )  # 10Y收益率变化阈值(%)
+
+    # ========================================
+    # COMEX库存监控配置
+    # ========================================
+    ENABLE_COMEX = os.getenv("ENABLE_COMEX", "true").lower() == "true"
+
+    # 白银三级预警阈值 (单位: 盎司)
+    # 🟢 安全: >= 40M oz
+    # 🟡 警戒线: < 40M oz (市场紧张)
+    # 🔴 生死线: < 30M oz (脱钩风险)
+    # ⚫ 熔断线: < 20M oz (系统性风险)
+    COMEX_SILVER_YELLOW_THRESHOLD = int(
+        os.getenv("COMEX_SILVER_YELLOW_THRESHOLD", "40000000")
+    )  # 4000万盎司
+    COMEX_SILVER_RED_THRESHOLD = int(
+        os.getenv("COMEX_SILVER_RED_THRESHOLD", "30000000")
+    )  # 3000万盎司
+    COMEX_SILVER_FAILURE_THRESHOLD = int(
+        os.getenv("COMEX_SILVER_FAILURE_THRESHOLD", "20000000")
+    )  # 2000万盎司
+
+    # 黄金三级预警阈值 (单位: 盎司)
+    COMEX_GOLD_YELLOW_THRESHOLD = int(
+        os.getenv("COMEX_GOLD_YELLOW_THRESHOLD", "10000000")
+    )  # 1000万盎司
+    COMEX_GOLD_RED_THRESHOLD = int(
+        os.getenv("COMEX_GOLD_RED_THRESHOLD", "5000000")
+    )  # 500万盎司
+    COMEX_GOLD_FAILURE_THRESHOLD = int(
+        os.getenv("COMEX_GOLD_FAILURE_THRESHOLD", "2000000")
+    )  # 200万盎司
+
+    # ========================================
+    # Tavily搜索关键词池 - 按时间窗口分组
+    # ========================================
+    # Flash Window (12小时) - 即时突发
+
+    TAVILY_FLASH_QUERIES = [
+        "breaking news geopolitical tension gold silver precious metals",
+        "VIX volatility spike market fear risk off",
+        "Federal Reserve emergency statement dollar",
+    ]
+
+    # Cycle Window (7天) - 周度数据
+    TAVILY_CYCLE_QUERIES = [
+        "US CPI inflation data release this week",
+        "Non-Farm Payrolls NFP employment report",
+        "Federal Reserve FOMC interest rate decision",
+        "PCE inflation data personal consumption expenditure",
+    ]
+
+    # Trend Window (30天) - 月度趋势
+    TAVILY_TREND_QUERIES = [
+        "Central Bank gold buying reserves monthly",
+        "Gold ETF inflows outflows GLD IAU",
+        "Silver industrial demand solar panel EV",
+        "COMEX gold silver futures positioning",
     ]
 
     # 可信新闻源域名(用于Tavily过滤)
@@ -170,6 +231,7 @@ class Config:
         "risk on",
         "volatility",
         "uncertainty",
+        "vix",
     ]
 
     # 黑名单关键词(包含任一即过滤)
@@ -203,11 +265,6 @@ class Config:
     ]
 
     # ========================================
-    # 调度配置
-    # ========================================
-    SCHEDULE_INTERVAL_HOURS = int(os.getenv("SCHEDULE_INTERVAL_HOURS", "6"))
-
-    # ========================================
     # 网络配置
     # ========================================
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
@@ -216,13 +273,12 @@ class Config:
     # ========================================
     # 数据处理配置
     # ========================================
-    DEDUPLICATION_WINDOW_HOURS = int(os.getenv("DEDUPLICATION_WINDOW_HOURS", "24"))
+    DEDUPLICATION_WINDOW_HOURS = int(os.getenv("DEDUPLICATION_WINDOW_HOURS", "12"))
 
     # ========================================
     # Email Digest (OpenRouter -> Gmail SMTP)
     # ========================================
-    ENABLE_EMAIL_DIGEST = os.getenv("ENABLE_EMAIL_DIGEST", "false").lower() == "true"
-    DIGEST_WINDOW_HOURS = int(os.getenv("DIGEST_WINDOW_HOURS", "24"))
+    DIGEST_WINDOW_HOURS = int(os.getenv("DIGEST_WINDOW_HOURS", "12"))
 
     DIGEST_INCLUDE_FULL_CONTENT = (
         os.getenv("DIGEST_INCLUDE_FULL_CONTENT", "false").lower() == "true"
@@ -234,8 +290,8 @@ class Config:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-3-pro-preview")
     OPENROUTER_TEMPERATURE = float(os.getenv("OPENROUTER_TEMPERATURE", "0.3"))
-    OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "4096"))
-    OPENROUTER_TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "60"))
+    OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "8192"))
+    OPENROUTER_TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "120"))
     OPENROUTER_MAX_RETRIES = int(os.getenv("OPENROUTER_MAX_RETRIES", "3"))
     OPENROUTER_HTTP_REFERER = os.getenv("OPENROUTER_HTTP_REFERER")
     OPENROUTER_X_TITLE = os.getenv("OPENROUTER_X_TITLE")
@@ -278,23 +334,20 @@ class Config:
         if cls.ENABLE_ALPHA_VANTAGE and not cls.ALPHA_VANTAGE_API_KEY:
             errors.append("ALPHA_VANTAGE_API_KEY未配置(已启用Alpha Vantage)")
 
-        # Email digest 配置
-        if cls.ENABLE_EMAIL_DIGEST:
-            if not cls.OPENROUTER_API_KEY:
-                errors.append("OPENROUTER_API_KEY未配置(已启用邮件摘要)")
+        # Email digest 配置 (必需)
+        if not cls.OPENROUTER_API_KEY:
+            errors.append("OPENROUTER_API_KEY未配置(邮件摘要必需)")
 
-            if not cls.SMTP_USERNAME:
-                errors.append("SMTP_USERNAME未配置(已启用邮件摘要)")
-            if not cls.SMTP_PASSWORD:
-                errors.append("SMTP_PASSWORD未配置(已启用邮件摘要)")
-            if not cls.EMAIL_FROM:
-                errors.append("EMAIL_FROM未配置(已启用邮件摘要)")
+        if not cls.SMTP_USERNAME:
+            errors.append("SMTP_USERNAME未配置(邮件发送必需)")
+        if not cls.SMTP_PASSWORD:
+            errors.append("SMTP_PASSWORD未配置(邮件发送必需)")
+        if not cls.EMAIL_FROM:
+            errors.append("EMAIL_FROM未配置(邮件发送必需)")
 
-            to_list = [
-                email.strip() for email in cls.EMAIL_TO.split(",") if email.strip()
-            ]
-            if not to_list:
-                errors.append("EMAIL_TO未配置或为空(已启用邮件摘要)")
+        to_list = [email.strip() for email in cls.EMAIL_TO.split(",") if email.strip()]
+        if not to_list:
+            errors.append("EMAIL_TO未配置或为空(邮件发送必需)")
 
         if errors:
             raise ValueError(f"配置错误:\n" + "\n".join(f"  - {e}" for e in errors))

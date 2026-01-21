@@ -35,6 +35,12 @@ class GmailSmtpMailer:
         msg["From"] = email_from
         msg["To"] = ", ".join(to_list)
 
+        plain_body = "".join(
+            line.rstrip() + "\n"
+            for line in html_body.replace("<br>", "\n").splitlines()
+        ).strip()
+
+        msg.attach(MIMEText(plain_body, "plain", "utf-8"))
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         with smtplib.SMTP(self.host, self.port, timeout=30) as server:

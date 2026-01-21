@@ -12,6 +12,7 @@ alpha-vantage==2.3.1          # Alpha Vantage (备选)
 requests==2.32.3              # HTTP请求
 beautifulsoup4==4.12.3        # HTML解析
 lxml==5.3.0                   # XML解析器(feedparser依赖)
+xlrd==2.0.1                   # Excel解析器(COMEX数据)
 
 # ========================================
 # Data Processing
@@ -21,9 +22,13 @@ numpy==2.0.2                  # 数值计算
 python-dateutil==2.9.0        # 日期处理
 
 # ========================================
-# Scheduling & Storage
+# Data Models
 # ========================================
-APScheduler==3.10.4           # 定时任务调度
+pydantic==2.10.3              # 数据模型验证
+
+# ========================================
+# Storage (APScheduler已移除)
+# ========================================
 # sqlalchemy==2.0.36          # 数据库ORM(可选扩展)
 
 # ========================================

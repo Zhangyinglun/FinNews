@@ -1,0 +1,43 @@
+{
+  "input_count": 6,
+  "output_count": 5,
+  "filtered_count": 1,
+  "cleaned_data": [
+    {
+      "type": "news",
+      "title": "Gold prices surge as inflation concerns grow",
+      "summary": "Gold futures rose sharply amid rising inflation expectations...",
+      "source": "Reuters",
+      "timestamp": "2026-01-20T10:00:00",
+      "impact_tag": "#Bullish"
+    },
+    {
+      "type": "news",
+      "title": "Silver demand increases",
+      "summary": "Industrial demand for silver is rising...",
+      "source": "Bloomberg",
+      "timestamp": "2026-01-20T11:00:00",
+      "impact_tag": "#Bullish"
+    },
+    {
+      "type": "price_data",
+      "ticker": "GC=F",
+      "price": 2050.12,
+      "timestamp": "2026-01-20T13:00:00"
+    },
+    {
+      "type": "economic_data",
+      "indicator": "CPI",
+      "value": 3.2,
+      "timestamp": "2026-01-20T14:00:00"
+    },
+    {
+      "type": "news",
+      "title": "Market outlook uncertain",
+      "summary": "Trading volumes remain low...",
+      "source": "WSJ",
+      "timestamp": "2026-01-20T15:00:00",
+      "impact_tag": "#Neutral"
+    }
+  ]
+}

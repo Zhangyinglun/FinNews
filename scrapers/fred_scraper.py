@@ -16,6 +16,20 @@ except ImportError:
 from .base_scraper import BaseScraper
 from config.config import Config
 
+# 每日/低频发布的指标 (用于标记)
+DAILY_RELEASE_INDICATORS = {
+    "cpi",
+    "core_cpi",
+    "pce",
+    "core_pce",
+    "nonfarm_payroll",
+    "unemployment",
+    "fed_funds",
+    "gdp",
+    "m1",
+    "m2",
+}
+
 
 class FREDScraper(BaseScraper):
     """FRED经济数据爬虫"""
@@ -85,10 +99,23 @@ class FREDScraper(BaseScraper):
                     "type": "economic_data",
                 }
 
+                # 标记每日发布数据
+                if indicator_name in DAILY_RELEASE_INDICATORS:
+                    record["daily_label"] = "每日发布数据"
+
                 all_data.append(record)
 
             except Exception as e:
                 self.logger.error(f"FRED抓取失败 {indicator_name} ({series_id}): {e}")
                 continue
 
-        return all_data
+        # 应用时间窗口过滤 (12小时)，允许回退到最新数据
+        filtered_data = self._filter_recent_records(
+            all_data,
+            window_hours=Config.FLASH_WINDOW_HOURS,
+            allow_fallback=True,
+            fallback_note="FRED数据为低频发布，显示最近一次更新",
+            daily_label="每日发布数据",
+        )
+
+        return filtered_data

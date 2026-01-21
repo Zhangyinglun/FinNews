@@ -1,10 +1,10 @@
 """生成摘要并保存为HTML文件（不发送邮件）
 
-使用当前 outputs/processed 目录中的最新数据生成摘要。
+使用当前 outputs/raw 目录中的最新数据生成摘要。
 
 Prereqs:
 - Set OPENROUTER_API_KEY in .env
-- Run `python main.py --mode once` first to generate data
+- Run `python main.py` first to generate data (or use sample data)
 
 Run:
   python test_digest_to_file.py
@@ -15,8 +15,10 @@ from pathlib import Path
 from datetime import datetime
 
 from config.config import Config
-from utils.digest_controller import DIGEST_JSON_SCHEMA, DailyDigestController
+from utils.digest_controller import DIGEST_JSON_SCHEMA, DigestController
 from utils.openrouter_client import OpenRouterClient
+from analyzers.rule_engine import RuleEngine
+from analyzers.market_analyzer import MarketAnalyzer
 
 
 def load_latest_processed_data():
@@ -27,9 +29,7 @@ def load_latest_processed_data():
     )
 
     if not json_files:
-        raise FileNotFoundError(
-            "No raw data found. Run 'python main.py --mode once' first."
-        )
+        raise FileNotFoundError("No raw data found. Run 'python main.py' first.")
 
     latest_file = json_files[0]
     print(f"Loading data from: {latest_file}")
@@ -46,19 +46,26 @@ def main():
     records = load_latest_processed_data()
     print(f"Loaded {len(records)} records")
 
+    # 规则引擎分析
+    price_data = [r for r in records if r.get("type") == "price_data"]
+    rule_engine = RuleEngine()
+    market_signal = rule_engine.analyze(price_data)
+
+    print(f"VIX: {market_signal.vix_value or 'N/A'}")
+    print(f"VIX Alert: {market_signal.vix_alert_level.value}")
+    print(f"Macro Bias: {market_signal.macro_bias.value}")
+
+    # 市场分析器组织数据
+    market_analyzer = MarketAnalyzer()
+    multi_window_data = market_analyzer.organize_data(records, market_signal)
+
+    print(f"Flash news: {len(multi_window_data.flash.news)}")
+    print(f"Cycle news: {len(multi_window_data.cycle.news)}")
+    print(f"Trend news: {len(multi_window_data.trend.news)}")
+
     # 创建摘要控制器
-    controller = DailyDigestController(window_hours=Config.DIGEST_WINDOW_HOURS)
-    stats = controller.update(records)
-
-    print(f"Window: {stats.window_hours}h | Records in window: {stats.total_records}")
-    print(f"Counts by type: {stats.counts_by_type}")
-    print(f"Counts by source: {stats.counts_by_source}")
-
-    # 构建 LLM 输入
-    user_prompt, _ = controller.build_llm_input(
-        include_full_content=Config.DIGEST_INCLUDE_FULL_CONTENT,
-        max_full_content_chars_per_article=Config.DIGEST_FULL_CONTENT_MAX_CHARS_PER_ARTICLE,
-    )
+    controller = DigestController()
+    user_prompt, stats = controller.build_llm_prompt(multi_window_data, market_signal)
 
     print(f"\nPrompt size: {len(user_prompt)} chars")
     print("Calling OpenRouter...")
@@ -73,20 +80,27 @@ def main():
         x_title=Config.OPENROUTER_X_TITLE,
     )
 
-    system_prompt = (
-        "You are a financial analyst writing an HTML email digest focused on gold and silver price trends. "
-        "Output MUST be in Chinese (中文). "
-        "Structure the email in EXACTLY 4 sections:\n\n"
-        "1) 市场指数与数据 - Current prices, economic indicators, FX rates (factual summary only)\n"
-        "2) 重点新闻 - Top 5-8 most important news items (title + brief description, NO analysis)\n"
-        "3) 其他新闻 - Remaining news items (title + brief description, NO analysis)\n"
-        "4) 市场分析 - Deep analysis of how ALL the above news and data will impact gold (XAU) and silver (XAG) prices. "
-        "Discuss bullish/bearish factors, correlations, technical levels, safe-haven demand, inflation expectations, USD strength, geopolitical risks, etc.\n\n"
-        "IMPORTANT: Sections 2 and 3 should ONLY contain factual news summaries without analysis. "
-        "ALL analysis must be in Section 4. "
-        "Use professional HTML formatting suitable for Gmail with clear headings. "
-        "All content must be in Chinese."
-    )
+    # 4段式系统提示
+    system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
+请根据提供的多窗口数据，生成一份结构化的HTML邮件摘要。
+
+邮件必须包含以下4个板块:
+1. 市场指数与数据 - 顶部显示VIX信号灯(圆圈样式🟢/⚠️/🔴)，然后是价格表和经济指标
+2. 重点新闻 - 5-8条最重要的新闻，仅陈述事实，不要添加任何分析内容
+3. 其他新闻 - 剩余新闻，仅陈述事实，不要添加任何分析内容
+4. 市场分析 - 所有分析内容集中在此板块，包含情绪判断、走势预判、风险点和操作建议
+
+重要规则:
+- VIX信号灯必须在"市场指数与数据"板块顶部，使用圆圈样式显示状态
+- 新闻板块(第2、3部分)只陈述事实，绝对不要包含任何分析性语言
+- 所有分析、判断、建议必须集中在"市场分析"板块
+
+输出要求:
+- 所有内容必须使用中文
+- HTML格式，适合Gmail邮件客户端
+- 使用专业但易懂的语言
+- 数据引用要准确
+- 严格按照JSON Schema返回结果"""
 
     resp = client.chat_completions(
         system_prompt=system_prompt,
@@ -117,14 +131,14 @@ def main():
 
     # 包装完整的 HTML 文档
     full_html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{subject}</title>
     <style>
         body {{
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
             max-width: 800px;
             margin: 0 auto;
@@ -158,7 +172,7 @@ def main():
         <h1>{subject}</h1>
         <div class="metadata">
             Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}<br>
-            Window: {stats.window_hours} hours | Records: {stats.total_records}
+            Flash: {stats["flash_news_count"]} | Cycle: {stats["cycle_news_count"]} | Trend: {stats["trend_news_count"]}
         </div>
         {html_body}
     </div>
