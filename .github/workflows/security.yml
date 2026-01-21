@@ -1,0 +1,58 @@
+name: Security Checks
+
+on:
+  schedule:
+    # 每周一凌晨运行
+    - cron: "0 8 * * 1"  # UTC 08:00 = PST 00:00 / PDT 01:00
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - '.github/workflows/security.yml'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: 依赖审查
+        uses: actions/dependency-review-action@v4
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: 安装 pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: 运行安全审计
+        run: |
+          pip-audit -r requirements.txt --desc || echo "⚠️ 发现安全漏洞"
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史
+
+      - name: 扫描敏感信息泄露
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
