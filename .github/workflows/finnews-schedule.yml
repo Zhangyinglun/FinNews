@@ -64,15 +64,19 @@ jobs:
           hour=$(date +%H)
           minute=$(date +%M)
 
-          if [ "$minute" != "00" ]; then
+          # 允许5分钟误差窗口，避免因延迟跳过执行
+          if [ "$minute" -gt "05" ]; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "⏰ 时间不匹配: $hour:$minute (需要 08:00 或 20:00 ±5分钟)"
             exit 0
           fi
 
           if [ "$hour" = "08" ] || [ "$hour" = "20" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "✅ 时间匹配: $hour:$minute，允许执行"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "⏰ 小时不匹配: $hour (需要 08 或 20)"
           fi
 
       - uses: actions/setup-python@v5
@@ -104,6 +108,41 @@ jobs:
           time.sleep(sleep_seconds)
           PY
 
+      - name: Verify configuration
+        if: steps.gate.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          echo "🔍 验证配置..."
+          python - <<'PY'
+          import os
+          import sys
+          
+          required_keys = [
+              "TAVILY_API_KEY",
+              "FRED_API_KEY", 
+              "OPENROUTER_API_KEY",
+              "SMTP_USERNAME",
+              "SMTP_PASSWORD",
+              "EMAIL_FROM",
+              "EMAIL_TO",
+          ]
+          
+          missing = []
+          for key in required_keys:
+              value = os.environ.get(key, "")
+              if not value or value == "":
+                  missing.append(key)
+              else:
+                  # 打印前4个字符用于验证
+                  print(f"✅ {key}: {value[:4]}***")
+          
+          if missing:
+              print(f"❌ 缺少必需的环境变量: {', '.join(missing)}")
+              sys.exit(1)
+          else:
+              print("✅ 所有必需的配置已设置")
+          PY
+
       - name: Run pipeline (with retry/backoff)
         if: steps.gate.outputs.should_run == 'true'
         shell: bash
@@ -111,17 +150,26 @@ jobs:
           python - <<'PY'
           import subprocess
           import time
+          import sys
 
           max_attempts = 3
           for attempt in range(1, max_attempts + 1):
-            print(f"Attempt {attempt}/{max_attempts}")
-            p = subprocess.run(["python", "main.py"], check=False)
+            print(f"🔄 执行尝试 {attempt}/{max_attempts}...")
+            p = subprocess.run(["python", "main.py"], check=False, capture_output=False)
+            
             if p.returncode == 0:
+              print(f"✅ 执行成功!")
               raise SystemExit(0)
+            
+            print(f"❌ 执行失败 (退出码={p.returncode})")
+            
             if attempt < max_attempts:
               wait = 2 ** attempt
-              print(f"Run failed (code={p.returncode}); backoff {wait}s")
+              print(f"⏳ 等待 {wait} 秒后重试...")
               time.sleep(wait)
+            else:
+              print(f"❌ 达到最大重试次数，执行失败")
+          
           raise SystemExit(p.returncode)
           PY
 

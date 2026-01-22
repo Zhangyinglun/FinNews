@@ -11,6 +11,100 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _clean_env_value(value: str | None) -> str:
+    """
+    清理环境变量值，移除 BOM 和首尾空格
+
+    Args:
+        value: 环境变量值
+
+    Returns:
+        清理后的字符串
+    """
+    if value is None:
+        return ""
+    # 移除 BOM (Byte Order Mark) 字符和首尾空格
+    return value.strip("\ufeff").strip()
+
+
+def _getenv_int(key: str, default: str) -> int:
+    """
+    安全地获取整数类型的环境变量
+
+    Args:
+        key: 环境变量键名
+        default: 默认值（字符串形式）
+
+    Returns:
+        整数值
+    """
+    value = os.getenv(key, default)
+    return int(_clean_env_value(value))
+
+
+def _getenv_float(key: str, default: str) -> float:
+    """
+    安全地获取浮点数类型的环境变量
+
+    Args:
+        key: 环境变量键名
+        default: 默认值（字符串形式）
+
+    Returns:
+        浮点数值
+    """
+    value = os.getenv(key, default)
+    return float(_clean_env_value(value))
+
+
+def _getenv_bool(key: str, default: str) -> bool:
+    """
+    安全地获取布尔类型的环境变量
+
+    Args:
+        key: 环境变量键名
+        default: 默认值（字符串形式）
+
+    Returns:
+        布尔值
+    """
+    value = os.getenv(key, default)
+    return _clean_env_value(value).lower() == "true"
+
+
+def _getenv_str(key: str, default: str = "") -> str:
+    """
+    安全地获取字符串类型的环境变量
+
+    Args:
+        key: 环境变量键名
+        default: 默认值（如果为空字符串,返回原始 None）
+
+    Returns:
+        清理后的字符串（如果有默认值则保证非 None）
+    """
+    value = os.getenv(key)
+    if value is None or value == "":
+        return default
+    return _clean_env_value(value)
+
+
+def _getenv_str_optional(key: str) -> str | None:
+    """
+    安全地获取可选的字符串类型的环境变量（可能返回 None）
+
+    Args:
+        key: 环境变量键名
+
+    Returns:
+        清理后的字符串或 None
+    """
+    value = os.getenv(key)
+    if value is None or value == "":
+        return None
+    return _clean_env_value(value)
+
+
 class Config:
     """全局配置类"""
 
@@ -26,27 +120,27 @@ class Config:
     # ========================================
     # API密钥
     # ========================================
-    TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-    FRED_API_KEY = os.getenv("FRED_API_KEY")
-    ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+    TAVILY_API_KEY = _getenv_str_optional("TAVILY_API_KEY")
+    FRED_API_KEY = _getenv_str_optional("FRED_API_KEY")
+    ALPHA_VANTAGE_API_KEY = _getenv_str_optional("ALPHA_VANTAGE_API_KEY")
 
     # ========================================
     # 数据源开关
     # ========================================
-    ENABLE_TAVILY = os.getenv("ENABLE_TAVILY", "true").lower() == "true"
-    ENABLE_YFINANCE = os.getenv("ENABLE_YFINANCE", "true").lower() == "true"
-    ENABLE_RSS = os.getenv("ENABLE_RSS", "true").lower() == "true"
-    ENABLE_FRED = os.getenv("ENABLE_FRED", "true").lower() == "true"
-    ENABLE_ALPHA_VANTAGE = os.getenv("ENABLE_ALPHA_VANTAGE", "false").lower() == "true"
-    ENABLE_ETF = os.getenv("ENABLE_ETF", "true").lower() == "true"
+    ENABLE_TAVILY = _getenv_bool("ENABLE_TAVILY", "true")
+    ENABLE_YFINANCE = _getenv_bool("ENABLE_YFINANCE", "true")
+    ENABLE_RSS = _getenv_bool("ENABLE_RSS", "true")
+    ENABLE_FRED = _getenv_bool("ENABLE_FRED", "true")
+    ENABLE_ALPHA_VANTAGE = _getenv_bool("ENABLE_ALPHA_VANTAGE", "false")
+    ENABLE_ETF = _getenv_bool("ENABLE_ETF", "true")
 
     # ========================================
     # 多时间窗口配置
     # ========================================
-    FLASH_WINDOW_HOURS = int(os.getenv("FLASH_WINDOW_HOURS", "12"))  # 即时窗口(12小时)
+    FLASH_WINDOW_HOURS = _getenv_int("FLASH_WINDOW_HOURS", "12")  # 即时窗口(12小时)
 
-    CYCLE_WINDOW_DAYS = int(os.getenv("CYCLE_WINDOW_DAYS", "7"))  # 周度窗口(7天)
-    TREND_WINDOW_DAYS = int(os.getenv("TREND_WINDOW_DAYS", "30"))  # 月度窗口(30天)
+    CYCLE_WINDOW_DAYS = _getenv_int("CYCLE_WINDOW_DAYS", "7")  # 周度窗口(7天)
+    TREND_WINDOW_DAYS = _getenv_int("TREND_WINDOW_DAYS", "30")  # 月度窗口(30天)
 
     # ========================================
     # RSS订阅源配置
@@ -73,46 +167,44 @@ class Config:
     # ========================================
     # 规则引擎阈值配置
     # ========================================
-    VIX_ALERT_THRESHOLD = float(
-        os.getenv("VIX_ALERT_THRESHOLD", "20")
-    )  # VIX绝对值警戒线
-    VIX_SPIKE_PERCENT = float(os.getenv("VIX_SPIKE_PERCENT", "5"))  # VIX暴涨百分比阈值
-    DXY_CHANGE_THRESHOLD = float(
-        os.getenv("DXY_CHANGE_THRESHOLD", "0.5")
+    VIX_ALERT_THRESHOLD = _getenv_float("VIX_ALERT_THRESHOLD", "20")  # VIX绝对值警戒线
+    VIX_SPIKE_PERCENT = _getenv_float("VIX_SPIKE_PERCENT", "5")  # VIX暴涨百分比阈值
+    DXY_CHANGE_THRESHOLD = _getenv_float(
+        "DXY_CHANGE_THRESHOLD", "0.5"
     )  # DXY显著变化阈值(%)
-    US10Y_CHANGE_THRESHOLD = float(
-        os.getenv("US10Y_CHANGE_THRESHOLD", "2")
+    US10Y_CHANGE_THRESHOLD = _getenv_float(
+        "US10Y_CHANGE_THRESHOLD", "2"
     )  # 10Y收益率变化阈值(%)
 
     # ========================================
     # COMEX库存监控配置
     # ========================================
-    ENABLE_COMEX = os.getenv("ENABLE_COMEX", "true").lower() == "true"
+    ENABLE_COMEX = _getenv_bool("ENABLE_COMEX", "true")
 
     # 白银三级预警阈值 (单位: 盎司)
     # 🟢 安全: >= 40M oz
     # 🟡 警戒线: < 40M oz (市场紧张)
     # 🔴 生死线: < 30M oz (脱钩风险)
     # ⚫ 熔断线: < 20M oz (系统性风险)
-    COMEX_SILVER_YELLOW_THRESHOLD = int(
-        os.getenv("COMEX_SILVER_YELLOW_THRESHOLD", "40000000")
+    COMEX_SILVER_YELLOW_THRESHOLD = _getenv_int(
+        "COMEX_SILVER_YELLOW_THRESHOLD", "40000000"
     )  # 4000万盎司
-    COMEX_SILVER_RED_THRESHOLD = int(
-        os.getenv("COMEX_SILVER_RED_THRESHOLD", "30000000")
+    COMEX_SILVER_RED_THRESHOLD = _getenv_int(
+        "COMEX_SILVER_RED_THRESHOLD", "30000000"
     )  # 3000万盎司
-    COMEX_SILVER_FAILURE_THRESHOLD = int(
-        os.getenv("COMEX_SILVER_FAILURE_THRESHOLD", "20000000")
+    COMEX_SILVER_FAILURE_THRESHOLD = _getenv_int(
+        "COMEX_SILVER_FAILURE_THRESHOLD", "20000000"
     )  # 2000万盎司
 
     # 黄金三级预警阈值 (单位: 盎司)
-    COMEX_GOLD_YELLOW_THRESHOLD = int(
-        os.getenv("COMEX_GOLD_YELLOW_THRESHOLD", "10000000")
+    COMEX_GOLD_YELLOW_THRESHOLD = _getenv_int(
+        "COMEX_GOLD_YELLOW_THRESHOLD", "10000000"
     )  # 1000万盎司
-    COMEX_GOLD_RED_THRESHOLD = int(
-        os.getenv("COMEX_GOLD_RED_THRESHOLD", "5000000")
+    COMEX_GOLD_RED_THRESHOLD = _getenv_int(
+        "COMEX_GOLD_RED_THRESHOLD", "5000000"
     )  # 500万盎司
-    COMEX_GOLD_FAILURE_THRESHOLD = int(
-        os.getenv("COMEX_GOLD_FAILURE_THRESHOLD", "2000000")
+    COMEX_GOLD_FAILURE_THRESHOLD = _getenv_int(
+        "COMEX_GOLD_FAILURE_THRESHOLD", "2000000"
     )  # 200万盎司
 
     # ========================================
@@ -267,48 +359,46 @@ class Config:
     # ========================================
     # 网络配置
     # ========================================
-    MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
-    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
+    MAX_RETRIES = _getenv_int("MAX_RETRIES", "3")
+    REQUEST_TIMEOUT = _getenv_int("REQUEST_TIMEOUT", "30")
 
     # ========================================
     # 数据处理配置
     # ========================================
-    DEDUPLICATION_WINDOW_HOURS = int(os.getenv("DEDUPLICATION_WINDOW_HOURS", "12"))
+    DEDUPLICATION_WINDOW_HOURS = _getenv_int("DEDUPLICATION_WINDOW_HOURS", "12")
 
     # ========================================
     # Email Digest (OpenRouter -> Gmail SMTP)
     # ========================================
-    DIGEST_WINDOW_HOURS = int(os.getenv("DIGEST_WINDOW_HOURS", "12"))
+    DIGEST_WINDOW_HOURS = _getenv_int("DIGEST_WINDOW_HOURS", "12")
 
-    DIGEST_INCLUDE_FULL_CONTENT = (
-        os.getenv("DIGEST_INCLUDE_FULL_CONTENT", "false").lower() == "true"
-    )
-    DIGEST_FULL_CONTENT_MAX_CHARS_PER_ARTICLE = int(
-        os.getenv("DIGEST_FULL_CONTENT_MAX_CHARS_PER_ARTICLE", "2000")
+    DIGEST_INCLUDE_FULL_CONTENT = _getenv_bool("DIGEST_INCLUDE_FULL_CONTENT", "false")
+    DIGEST_FULL_CONTENT_MAX_CHARS_PER_ARTICLE = _getenv_int(
+        "DIGEST_FULL_CONTENT_MAX_CHARS_PER_ARTICLE", "2000"
     )
 
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-3-pro-preview")
-    OPENROUTER_TEMPERATURE = float(os.getenv("OPENROUTER_TEMPERATURE", "0.3"))
-    OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "8192"))
-    OPENROUTER_TIMEOUT = int(os.getenv("OPENROUTER_TIMEOUT", "120"))
-    OPENROUTER_MAX_RETRIES = int(os.getenv("OPENROUTER_MAX_RETRIES", "3"))
-    OPENROUTER_HTTP_REFERER = os.getenv("OPENROUTER_HTTP_REFERER")
-    OPENROUTER_X_TITLE = os.getenv("OPENROUTER_X_TITLE")
+    OPENROUTER_API_KEY = _getenv_str_optional("OPENROUTER_API_KEY")
+    OPENROUTER_MODEL = _getenv_str("OPENROUTER_MODEL", "google/gemini-3-pro-preview")
+    OPENROUTER_TEMPERATURE = _getenv_float("OPENROUTER_TEMPERATURE", "0.3")
+    OPENROUTER_MAX_TOKENS = _getenv_int("OPENROUTER_MAX_TOKENS", "8192")
+    OPENROUTER_TIMEOUT = _getenv_int("OPENROUTER_TIMEOUT", "120")
+    OPENROUTER_MAX_RETRIES = _getenv_int("OPENROUTER_MAX_RETRIES", "3")
+    OPENROUTER_HTTP_REFERER = _getenv_str_optional("OPENROUTER_HTTP_REFERER")
+    OPENROUTER_X_TITLE = _getenv_str_optional("OPENROUTER_X_TITLE")
 
-    SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-    SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    SMTP_HOST = _getenv_str("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT = _getenv_int("SMTP_PORT", "587")
+    SMTP_USERNAME = _getenv_str_optional("SMTP_USERNAME")
+    SMTP_PASSWORD = _getenv_str_optional("SMTP_PASSWORD")
+    SMTP_USE_TLS = _getenv_bool("SMTP_USE_TLS", "true")
 
-    EMAIL_FROM = os.getenv("EMAIL_FROM")
-    EMAIL_TO = os.getenv("EMAIL_TO", "")
+    EMAIL_FROM = _getenv_str_optional("EMAIL_FROM")
+    EMAIL_TO = _getenv_str("EMAIL_TO", "")
 
     # ========================================
     # 日志配置
     # ========================================
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    LOG_LEVEL = _getenv_str("LOG_LEVEL", "INFO")
 
     # ========================================
     # 初始化方法
@@ -345,9 +435,15 @@ class Config:
         if not cls.EMAIL_FROM:
             errors.append("EMAIL_FROM未配置(邮件发送必需)")
 
-        to_list = [email.strip() for email in cls.EMAIL_TO.split(",") if email.strip()]
-        if not to_list:
+        # 检查 EMAIL_TO
+        if not cls.EMAIL_TO:
             errors.append("EMAIL_TO未配置或为空(邮件发送必需)")
+        else:
+            to_list = [
+                email.strip() for email in cls.EMAIL_TO.split(",") if email.strip()
+            ]
+            if not to_list:
+                errors.append("EMAIL_TO未配置或为空(邮件发送必需)")
 
         if errors:
             raise ValueError(f"配置错误:\n" + "\n".join(f"  - {e}" for e in errors))
