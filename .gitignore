@@ -43,6 +43,8 @@ env/
 outputs/raw/*.json
 outputs/processed/*.md
 outputs/logs/*.log
+outputs/*.json
+outputs/digest_preview_*.html
 
 # Keep directory structure
 !outputs/raw/.gitkeep
