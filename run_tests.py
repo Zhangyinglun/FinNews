@@ -14,10 +14,12 @@ FinNews 测试运行脚本 | FinNews Test Runner
 """
 
 import sys
+import os
 import subprocess
 from pathlib import Path
 from datetime import datetime
 import argparse
+from typing import Optional
 
 # 确保可以导入项目模块
 sys.path.insert(0, str(Path(__file__).parent))
@@ -101,11 +103,14 @@ def run_test_file(test_file: str) -> bool:
     print("-" * 40)
 
     try:
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(Path(__file__).parent)
         result = subprocess.run(
             [sys.executable, str(test_path)],
             capture_output=False,
             text=True,
             timeout=300,  # 5分钟超时
+            env=env,
         )
 
         if result.returncode == 0:
@@ -123,7 +128,7 @@ def run_test_file(test_file: str) -> bool:
         return False
 
 
-def run_tests(module: str = None, quick: bool = False):
+def run_tests(module: Optional[str] = None, quick: bool = False):
     """运行测试
 
     Args:
