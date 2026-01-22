@@ -52,48 +52,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Gate schedule to 08:00/20:00 PT
-        id: gate
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          hour=$(date +%H)
-          minute=$(date +%M)
-
-          # 允许5分钟误差窗口，避免因延迟跳过执行
-          if [ "$minute" -gt "05" ]; then
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "⏰ 时间不匹配: $hour:$minute (需要 08:00 或 20:00 ±5分钟)"
-            exit 0
-          fi
-
-          if [ "$hour" = "08" ] || [ "$hour" = "20" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "✅ 时间匹配: $hour:$minute，允许执行"
-          else
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "⏰ 小时不匹配: $hour (需要 08 或 20)"
-          fi
-
       - uses: actions/setup-python@v5
-        if: steps.gate.outputs.should_run == 'true'
         with:
           python-version: "3.10"
           cache: pip
 
       - name: Install dependencies
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Jitter (avoid busy window)
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           max=${FINNEWS_JITTER_MAX_SECONDS:-600}
@@ -109,7 +79,6 @@ jobs:
           PY
 
       - name: Verify configuration
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           echo "🔍 验证配置..."
@@ -163,7 +132,6 @@ jobs:
           PY
 
       - name: Run pipeline (with retry/backoff)
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           python - <<'PY'
@@ -193,7 +161,6 @@ jobs:
           PY
 
       - name: Upload outputs
-        if: steps.gate.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: finnews-outputs-${{ github.run_id }}
