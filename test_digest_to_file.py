@@ -80,26 +80,21 @@ def main():
         x_title=Config.OPENROUTER_X_TITLE,
     )
 
-    # 4段式系统提示
+    # LLM系统提示 - 只返回结构化数据，不生成HTML
     system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
-请根据提供的多窗口数据，生成一份结构化的HTML邮件摘要。
+请根据提供的数据，返回结构化的JSON数据。
 
-邮件必须包含以下4个板块:
-1. 市场指数与数据 - 顶部显示VIX信号灯(圆圈样式🟢/⚠️/🔴)，然后是价格表和经济指标
-2. 重点新闻 - 5-8条最重要的新闻，仅陈述事实，不要添加任何分析内容
-3. 其他新闻 - 剩余新闻，仅陈述事实，不要添加任何分析内容
-4. 市场分析 - 所有分析内容集中在此板块，包含情绪判断、走势预判、风险点和操作建议
+你的任务:
+1. 生成邮件标题 (subject)
+2. 从新闻中筛选5-8条最重要的作为重点新闻 (key_news)
+3. 将其他相关新闻放入其他新闻 (other_news)  
+4. 撰写市场分析 (analysis)
 
 重要规则:
-- VIX信号灯必须在"市场指数与数据"板块顶部，使用圆圈样式显示状态
-- 新闻板块(第2、3部分)只陈述事实，绝对不要包含任何分析性语言
-- 所有分析、判断、建议必须集中在"市场分析"板块
-
-输出要求:
-- 所有内容必须使用中文
-- HTML格式，适合Gmail邮件客户端
-- 使用专业但易懂的语言
-- 数据引用要准确
+- 所有英文新闻标题和摘要必须翻译成中文
+- 新闻只陈述事实，不要添加任何分析性语言
+- 所有分析、判断、建议必须放在analysis字段
+- 使用中文，专业但易懂
 - 严格按照JSON Schema返回结果"""
 
     resp = client.chat_completions(
@@ -118,10 +113,16 @@ def main():
     if not isinstance(content, str):
         raise SystemExit(f"Unexpected response content: {content}")
 
-    digest = json.loads(content)
+    digest_data = json.loads(content)
 
-    subject = digest.get("subject", "FinNews Digest")
-    html_body = digest.get("html_body", "<p>No content</p>")
+    # 使用模板渲染HTML
+    subject = digest_data.get("subject", "FinNews Digest")
+    html_body = controller.render_email_html(
+        digest_data=digest_data,
+        signal=market_signal,
+        data=multi_window_data,
+        comex_signal=None,  # 如果需要COMEX数据，需要从规则引擎获取
+    )
 
     # 保存为 HTML 文件
     output_file = (
