@@ -307,14 +307,14 @@ class DigestController:
                 else:
                     change_str = "-"
                 price_rows.append(f"""<tr>
-                    <td style="padding: 10px 16px; text-align: left; border-bottom: 1px solid #f0f0f0;">{name}</td>
-                    <td style="padding: 10px 16px; text-align: right; border-bottom: 1px solid #f0f0f0;">{value_str}</td>
-                    <td style="padding: 10px 16px; text-align: right; border-bottom: 1px solid #f0f0f0;">{change_str}</td>
+                    <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">{name}</td>
+                    <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{value_str}</td>
+                    <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{change_str}</td>
                 </tr>""")
 
         price_table_html = "\n".join(price_rows)
 
-        # 构建经济指标
+        # 构建经济指标独立板块
         econ_items = []
         if data.cycle.cpi_actual:
             econ_items.append(f"CPI: {data.cycle.cpi_actual}")
@@ -326,14 +326,21 @@ class DigestController:
             econ_items.append(f"联邦基金利率: {data.cycle.fed_rate}%")
 
         if econ_items:
-            econ_html = (
-                '<div style="padding: 12px 16px; font-size: 13px; color: #666; background-color: #fafafa; border-top: 1px solid #e9ecef;">'
-                '<span style="color: #999; font-size: 11px;">📅 每日/定期发布数据</span><br/>'
-                + " | ".join(econ_items)
-                + "</div>"
-            )
+            econ_content = " | ".join(econ_items)
+            econ_section_html = f"""<tr>
+        <td style="padding: 0 16px 20px 16px;">
+            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
+                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
+                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📅 经济指标</span>
+                </div>
+                <div style="padding: 12px; font-size: 16px; color: #333;">
+                    {econ_content}
+                </div>
+            </div>
+        </td>
+    </tr>"""
         else:
-            econ_html = ""
+            econ_section_html = ""  # 无数据时隐藏整个板块
 
         # 构建重点新闻
         key_news_html = self._render_news_list(digest_data.get("key_news", []))
@@ -370,7 +377,7 @@ class DigestController:
             vix_bg_color=vix_bg_color,
             macro_bias=macro_bias_text,
             price_table=price_table_html,
-            econ_indicators=econ_html,
+            econ_section=econ_section_html,
             comex_section=comex_section_html,
             key_news=key_news_html,
             other_news=other_news_html,
@@ -382,7 +389,7 @@ class DigestController:
     def _render_news_list(self, news_list: List[Dict[str, str]]) -> str:
         """渲染新闻列表HTML (内联样式，Gmail兼容)"""
         if not news_list:
-            return '<div style="padding: 12px 0; color: #999;">暂无相关新闻</div>'
+            return '<div style="padding: 12px 0; color: #999; font-size: 16px;">暂无相关新闻</div>'
 
         items = []
         for i, news in enumerate(news_list):
@@ -396,9 +403,9 @@ class DigestController:
             )
 
             item_html = f"""<div style="padding: 12px 0; {border_style}">
-                <div style="font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px;">{title}</div>
-                <div style="font-size: 12px; color: #999; margin-bottom: 6px;">来源: {source}</div>
-                {f'<div style="font-size: 13px; color: #555; line-height: 1.6;">{summary}</div>' if summary else ""}
+                <div style="font-size: 19px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px;">{title}</div>
+                <div style="font-size: 16px; color: #999; margin-bottom: 6px;">来源: {source}</div>
+                {f'<div style="font-size: 17px; color: #555; line-height: 1.6;">{summary}</div>' if summary else ""}
             </div>"""
             items.append(item_html)
 
@@ -425,13 +432,13 @@ class DigestController:
             )
 
             item_html = f"""<div style="padding: 12px 0; {border_style}">
-                <div style="font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px;">{title}</div>
-                <div style="font-size: 13px; color: #555; line-height: 1.6;">{content}</div>
+                <div style="font-size: 18px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px;">{title}</div>
+                <div style="font-size: 17px; color: #555; line-height: 1.6;">{content}</div>
             </div>"""
             items.append(item_html)
 
         if not items:
-            return '<div style="padding: 12px 0; color: #999;">暂无分析内容</div>'
+            return '<div style="padding: 12px 0; color: #999; font-size: 16px;">暂无分析内容</div>'
 
         return "\n".join(items)
 
@@ -498,9 +505,9 @@ class DigestController:
                 weekly_str = f'<span style="color: {change_color}; font-weight: 500;">({comex_signal.silver_weekly_change_pct:+.1f}% 周)</span>'
 
             silver_rows.append(f"""<tr>
-                <td style="padding: 10px 16px; text-align: left; border-bottom: 1px solid #f0f0f0;">白银 (Registered)</td>
-                <td style="padding: 10px 16px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.silver_registered_million:.2f}M oz</td>
-                <td style="padding: 10px 16px; text-align: center; border-bottom: 1px solid #f0f0f0;">{silver_emoji} {weekly_str}</td>
+                <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">白银 (Registered)</td>
+                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.silver_registered_million:.2f}M oz</td>
+                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{silver_emoji} {weekly_str}</td>
             </tr>""")
 
         # 构建黄金行
@@ -521,9 +528,9 @@ class DigestController:
                 weekly_str = f'<span style="color: {change_color}; font-weight: 500;">({comex_signal.gold_weekly_change_pct:+.1f}% 周)</span>'
 
             gold_rows.append(f"""<tr>
-                <td style="padding: 10px 16px; text-align: left; border-bottom: 1px solid #f0f0f0;">黄金 (Registered)</td>
-                <td style="padding: 10px 16px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.gold_registered_million:.2f}M oz</td>
-                <td style="padding: 10px 16px; text-align: center; border-bottom: 1px solid #f0f0f0;">{gold_emoji} {weekly_str}</td>
+                <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">黄金 (Registered)</td>
+                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.gold_registered_million:.2f}M oz</td>
+                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{gold_emoji} {weekly_str}</td>
             </tr>""")
 
         if not silver_rows and not gold_rows:
@@ -546,7 +553,7 @@ class DigestController:
                     for msg in alert_messages
                 ]
             )
-            alert_html = f"""<div style="padding: 12px 16px; font-size: 13px; background-color: #fafafa; border-top: 1px solid #e9ecef;">
+            alert_html = f"""<div style="padding: 10px 12px; font-size: 16px; background-color: #fafafa; border-top: 1px solid #e9ecef;">
                 {alert_items}
             </div>"""
 
@@ -571,7 +578,7 @@ class DigestController:
                     for rec in recommendations
                 ]
             )
-            rec_html = f"""<div style="padding: 12px 16px; font-size: 13px; color: #856404; background-color: #fff3cd; border-top: 1px solid #e9ecef;">
+            rec_html = f"""<div style="padding: 10px 12px; font-size: 16px; color: #856404; background-color: #fff3cd; border-top: 1px solid #e9ecef;">
                 {rec_items}
             </div>"""
 
@@ -584,17 +591,17 @@ class DigestController:
 
         return f"""<!-- COMEX Inventory Section -->
         <tr>
-            <td style="padding: 0 32px 24px 32px;">
+            <td style="padding: 0 16px 20px 16px;">
                 <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #f8f9fa; padding: 12px 16px; border-bottom: 1px solid #e9ecef;">
-                        <span style="font-size: 15px; font-weight: 600; color: #1a1a2e;">🏦 COMEX库存监控{report_date_str}</span>
-                        <span style="float: right; font-size: 14px;">{emoji} {status_text}</span>
+                    <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
+                        <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">🏦 COMEX库存监控{report_date_str}</span>
+                        <span style="float: right; font-size: 16px;">{emoji} {status_text}</span>
                     </div>
-                    <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 18px;">
                         <tr style="background-color: #f8f9fa;">
-                            <th style="padding: 10px 16px; text-align: left; font-weight: 600; color: #666; border-bottom: 1px solid #e9ecef;">品种</th>
-                            <th style="padding: 10px 16px; text-align: right; font-weight: 600; color: #666; border-bottom: 1px solid #e9ecef;">库存</th>
-                            <th style="padding: 10px 16px; text-align: center; font-weight: 600; color: #666; border-bottom: 1px solid #e9ecef;">状态</th>
+                            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">品种</th>
+                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">库存</th>
+                            <th style="padding: 10px 12px; text-align: center; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">状态</th>
                         </tr>
                         {table_rows}
                     </table>
@@ -683,30 +690,30 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 8px 0;">
         <tr>
             <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                     
                     <!-- Header -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 24px 32px;">
-                            <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600;">{subject}</h1>
-                            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.7); font-size: 13px;">生成时间: {datetime}</p>
+                        <td style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 20px 16px;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">{subject}</h1>
+                            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.7); font-size: 14px;">生成时间: {datetime}</p>
                         </td>
                     </tr>
 
                     <!-- VIX Signal -->
                     <tr>
-                        <td style="padding: 24px 32px 16px 32px;">
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; padding: 16px;">
+                        <td style="padding: 16px 16px 12px 16px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; padding: 12px;">
                                 <tr>
-                                    <td width="50" style="vertical-align: middle; padding: 12px;">
-                                        <div style="width: 44px; height: 44px; border-radius: 50%; background-color: {vix_bg_color}; text-align: center; line-height: 44px; font-size: 22px;">{vix_emoji}</div>
+                                    <td width="50" style="vertical-align: middle; padding: 10px;">
+                                        <div style="width: 48px; height: 48px; border-radius: 50%; background-color: {vix_bg_color}; text-align: center; line-height: 48px; font-size: 26px;">{vix_emoji}</div>
                                     </td>
-                                    <td style="vertical-align: middle; padding: 12px;">
-                                        <div style="font-size: 16px; font-weight: 600; color: #1a1a2e;">VIX: {vix_value} <span style="font-weight: 400; color: #666;">({vix_change})</span></div>
-                                        <div style="font-size: 13px; color: #666; margin-top: 4px;">市场状态: {vix_status} | 宏观倾向: {macro_bias}</div>
+                                    <td style="vertical-align: middle; padding: 10px;">
+                                        <div style="font-size: 20px; font-weight: 600; color: #1a1a2e;">VIX: {vix_value} <span style="font-weight: 400; color: #666;">({vix_change})</span></div>
+                                        <div style="font-size: 16px; color: #666; margin-top: 4px;">市场状态: {vix_status} | 宏观倾向: {macro_bias}</div>
                                     </td>
                                 </tr>
                             </table>
@@ -715,35 +722,37 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
 
                     <!-- Section 1: Market Data -->
                     <tr>
-                        <td style="padding: 0 32px 24px 32px;">
+                        <td style="padding: 0 16px 20px 16px;">
                             <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 12px 16px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 15px; font-weight: 600; color: #1a1a2e;">📈 市场行情</span>
+                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
+                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📈 市场行情</span>
                                 </div>
-                                <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px;">
+                                <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 18px;">
                                     <tr style="background-color: #f8f9fa;">
-                                        <th style="padding: 10px 16px; text-align: left; font-weight: 600; color: #666; border-bottom: 1px solid #e9ecef;">品种</th>
-                                        <th style="padding: 10px 16px; text-align: right; font-weight: 600; color: #666; border-bottom: 1px solid #e9ecef;">价格</th>
-                                        <th style="padding: 10px 16px; text-align: right; font-weight: 600; color: #666; border-bottom: 1px solid #e9ecef;">涨跌</th>
+                                        <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">品种</th>
+                                        <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">价格</th>
+                                        <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">涨跌</th>
                                     </tr>
                                     {price_table}
                                 </table>
-                                {econ_indicators}
                             </div>
                         </td>
                     </tr>
 
-                    <!-- Section 1.5: COMEX Inventory (dynamically inserted) -->
+                    <!-- Section 1.5: Economic Indicators (独立板块) -->
+                    {econ_section}
+
+                    <!-- Section 1.6: COMEX Inventory (dynamically inserted) -->
                     {comex_section}
 
                     <!-- Section 2: Key News -->
                     <tr>
-                        <td style="padding: 0 32px 24px 32px;">
+                        <td style="padding: 0 16px 20px 16px;">
                             <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 12px 16px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 15px; font-weight: 600; color: #1a1a2e;">📰 重点新闻</span>
+                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
+                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📰 重点新闻</span>
                                 </div>
-                                <div style="padding: 8px 16px;">
+                                <div style="padding: 8px 12px;">
                                     {key_news}
                                 </div>
                             </div>
@@ -752,12 +761,12 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
 
                     <!-- Section 3: Other News -->
                     <tr>
-                        <td style="padding: 0 32px 24px 32px;">
+                        <td style="padding: 0 16px 20px 16px;">
                             <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 12px 16px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 15px; font-weight: 600; color: #1a1a2e;">📋 其他新闻</span>
+                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
+                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📋 其他新闻</span>
                                 </div>
-                                <div style="padding: 8px 16px;">
+                                <div style="padding: 8px 12px;">
                                     {other_news}
                                 </div>
                             </div>
@@ -766,12 +775,12 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
 
                     <!-- Section 4: Analysis -->
                     <tr>
-                        <td style="padding: 0 32px 24px 32px;">
+                        <td style="padding: 0 16px 20px 16px;">
                             <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 12px 16px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 15px; font-weight: 600; color: #1a1a2e;">🔍 市场分析</span>
+                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
+                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">🔍 市场分析</span>
                                 </div>
-                                <div style="padding: 8px 16px;">
+                                <div style="padding: 8px 12px;">
                                     {analysis}
                                 </div>
                             </div>
@@ -780,9 +789,9 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
 
                     <!-- Footer -->
                     <tr>
-                        <td style="padding: 20px 32px; background-color: #f8f9fa; border-top: 1px solid #e9ecef;">
-                            <p style="margin: 0; font-size: 12px; color: #999; text-align: center;">FinNews - 黄金白银市场智能分析系统</p>
-                            <p style="margin: 6px 0 0 0; font-size: 11px; color: #bbb; text-align: center;">本报告由AI自动生成，仅供参考，不构成投资建议</p>
+                        <td style="padding: 16px 16px; background-color: #f8f9fa; border-top: 1px solid #e9ecef;">
+                            <p style="margin: 0; font-size: 14px; color: #999; text-align: center;">FinNews - 黄金白银市场智能分析系统</p>
+                            <p style="margin: 6px 0 0 0; font-size: 13px; color: #bbb; text-align: center;">本报告由AI自动生成，仅供参考，不构成投资建议</p>
                         </td>
                     </tr>
 

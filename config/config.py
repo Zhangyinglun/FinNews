@@ -146,11 +146,10 @@ class Config:
     # RSS订阅源配置
     # ========================================
     RSS_FEEDS = {
-        "kitco_gold": "https://www.kitco.com/rss/KitcoGold.xml",
+        "mining_com": "https://www.mining.com/feed/",
         "fxstreet_commodities": "https://www.fxstreet.com/rss/news/commodities/gold",
         "investing_commodities": "https://www.investing.com/rss/commodities.rss",
         "zerohedge": "http://feeds.feedburner.com/zerohedge/feed",
-        "oilprice": "https://oilprice.com/rss/main",
     }
 
     # ========================================
@@ -261,15 +260,8 @@ class Config:
         "unemployment": "UNRATE",  # 失业率
         # 利率与国债
         "fed_funds": "FEDFUNDS",  # 联邦基金利率
-        "treasury_10y": "DGS10",  # 10年期国债收益率
         "treasury_2y": "DGS2",  # 2年期国债收益率
         "real_interest_rate": "DFII10",  # 10年期实际利率
-        # 货币供应
-        "m1": "M1SL",  # M1货币供应
-        "m2": "M2SL",  # M2货币供应
-        # 其他
-        "gdp": "GDP",  # GDP
-        "dxy": "DTWEXBGS",  # 美元指数(FRED版)
     }
 
     # ========================================
