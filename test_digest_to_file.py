@@ -141,6 +141,7 @@ def main():
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
+            font-size: 16px;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
@@ -163,7 +164,7 @@ def main():
         }}
         .metadata {{
             color: #7f8c8d;
-            font-size: 0.9em;
+            font-size: 1.1em;
             margin-bottom: 20px;
         }}
     </style>
