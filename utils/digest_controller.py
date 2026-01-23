@@ -595,7 +595,6 @@ class DigestController:
                 <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
                     <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
                         <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">🏦 COMEX库存监控{report_date_str}</span>
-                        <span style="float: right; font-size: 16px;">{emoji} {status_text}</span>
                     </div>
                     <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 18px;">
                         <tr style="background-color: #f8f9fa;">
