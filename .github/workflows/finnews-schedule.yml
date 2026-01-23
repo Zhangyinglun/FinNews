@@ -1,14 +1,20 @@
 name: finnews-schedule
 
+# ⏰ 调度说明
+# 
+# 使用固定 UTC 时间，洛杉矶本地时间会随夏令时自动调整:
+# - 冬季 (PST, UTC-8): 16:00 UTC = 08:00 PST / 04:00 UTC = 20:00 PST
+# - 夏季 (PDT, UTC-7): 16:00 UTC = 09:00 PDT / 04:00 UTC = 21:00 PDT
+#
+# 无需手动调整 cron 配置
+
 on:
   workflow_dispatch:
   schedule:
     # GitHub Actions cron uses UTC only.
-    # We schedule both PST and PDT equivalents and gate by America/Los_Angeles.
-    - cron: "0 15 * * *" # 08:00 PDT
-    - cron: "0 16 * * *" # 08:00 PST
-    - cron: "0 3 * * *"  # 20:00 PDT
-    - cron: "0 4 * * *"  # 20:00 PST
+    # Local LA time adjusts automatically with DST.
+    - cron: "0 16 * * *" # ~08:00-09:00 LA time
+    - cron: "0 4 * * *"  # ~20:00-21:00 LA time
 
 permissions:
   contents: read
