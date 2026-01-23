@@ -112,16 +112,31 @@ class BaseScraper(ABC):
             return recent_records
 
         if allow_fallback:
-            latest = max(
+            # 找到最新的 timestamp
+            latest_timestamp = max(
                 records,
                 key=lambda record: self._parse_record_timestamp(
                     record.get("timestamp")
                 ),
             )
-            latest["fallback_allowed"] = True
-            if fallback_note:
-                latest["fallback_note"] = fallback_note
-            return [latest]
+            latest_time = self._parse_record_timestamp(
+                latest_timestamp.get("timestamp")
+            )
+
+            # 返回所有具有最新 timestamp 的记录
+            latest_records = [
+                record
+                for record in records
+                if self._parse_record_timestamp(record.get("timestamp")) == latest_time
+            ]
+
+            # 为所有返回的记录添加 fallback 标记
+            for record in latest_records:
+                record["fallback_allowed"] = True
+                if fallback_note:
+                    record["fallback_note"] = fallback_note
+
+            return latest_records
 
         return []
 
