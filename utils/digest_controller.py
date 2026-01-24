@@ -313,6 +313,18 @@ class DigestController:
                     <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{change_str}</td>
                 </tr>""")
 
+        # 防御性编程：如果所有价格数据都缺失，显示警告信息
+        if not price_rows:
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.warning("⚠️ 价格表数据全部缺失！signal对象中的价格字段都为None")
+            price_rows.append(f"""<tr>
+                <td colspan="3" style="padding: 20px 12px; text-align: center; color: #dc3545; border-bottom: 1px solid #f0f0f0;">
+                    ⚠️ 价格数据暂时不可用，请稍后查看
+                </td>
+            </tr>""")
+
         price_table_html = "\n".join(price_rows)
 
         # 构建经济指标独立板块

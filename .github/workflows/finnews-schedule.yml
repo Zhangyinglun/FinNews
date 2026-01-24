@@ -17,7 +17,7 @@ on:
     - cron: "0 4 * * *"  # ~20:00-21:00 LA time
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: finnews-schedule
@@ -166,6 +166,25 @@ jobs:
           raise SystemExit(p.returncode)
           PY
 
+      - name: Commit COMEX history
+        if: success()
+        shell: bash
+        run: |
+          # 配置 Git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 检查 COMEX 历史文件是否有变化
+          if git diff --quiet outputs/comex_history.json 2>/dev/null; then
+            echo "📊 COMEX历史数据无变化，跳过提交"
+          else
+            echo "📊 检测到COMEX历史数据变化，准备提交..."
+            git add outputs/comex_history.json
+            git commit -m "自动更新COMEX历史数据 $(date +'%Y-%m-%d')"
+            git push
+            echo "✅ COMEX历史数据已更新并推送"
+          fi
+
       - name: Upload outputs
         uses: actions/upload-artifact@v4
         with:
@@ -174,5 +193,60 @@ jobs:
             outputs/processed/**
             outputs/raw/**
             outputs/logs/**
+            outputs/comex_history.json
+            outputs/digest_preview_*.html
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Generate run summary
+        if: always()
+        shell: bash
+        run: |
+          echo "# 📧 FinNews 运行摘要" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**运行时间**: $(date +'%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # 检查输出文件
+          if [ -d outputs ]; then
+            echo "## 📦 生成的文件" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # 日志文件
+            if [ -d outputs/logs ]; then
+              LOG_COUNT=$(find outputs/logs -name "*.log" | wc -l)
+              echo "- 📝 日志文件: ${LOG_COUNT}个" >> $GITHUB_STEP_SUMMARY
+              find outputs/logs -name "*.log" -exec ls -lh {} \; | awk '{print "  - " $9 " (" $5 ")"}' >> $GITHUB_STEP_SUMMARY || true
+            fi
+            
+            # 处理后数据
+            if [ -d outputs/processed ]; then
+              PROC_COUNT=$(find outputs/processed -name "*.md" | wc -l)
+              echo "- 📊 处理数据: ${PROC_COUNT}个" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # 原始数据
+            if [ -d outputs/raw ]; then
+              RAW_COUNT=$(find outputs/raw -name "*.json" | wc -l)
+              echo "- 💾 原始数据: ${RAW_COUNT}个" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # COMEX历史
+            if [ -f outputs/comex_history.json ]; then
+              COMEX_SIZE=$(du -h outputs/comex_history.json | awk '{print $1}')
+              echo "- 🏦 COMEX历史: ${COMEX_SIZE}" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # 邮件预览
+            HTML_COUNT=$(find outputs -name "digest_preview_*.html" 2>/dev/null | wc -l)
+            if [ ${HTML_COUNT} -gt 0 ]; then
+              echo "- 📧 邮件预览: ${HTML_COUNT}个" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ outputs目录不存在" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "💡 提示: 点击下方'Artifacts'下载完整输出文件" >> $GITHUB_STEP_SUMMARY
+

@@ -216,6 +216,10 @@ def main():
 
     # 输出规则引擎结果
     logger.info(f"  → VIX: {market_signal.vix_value or 'N/A'}")
+    logger.info(f"  → 黄金: ${market_signal.gold_price or 'N/A'}")
+    logger.info(f"  → 白银: ${market_signal.silver_price or 'N/A'}")
+    logger.info(f"  → 美元指数: {market_signal.dxy_value or 'N/A'}")
+    logger.info(f"  → 10年期国债: {market_signal.us10y_value or 'N/A'}")
     logger.info(f"  → VIX警报: {market_signal.vix_alert_level.value}")
     logger.info(f"  → 宏观倾向: {market_signal.macro_bias.value}")
     logger.info(f"  → 情感评分: {market_signal.sentiment_score:.2f}")

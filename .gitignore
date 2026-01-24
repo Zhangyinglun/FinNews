@@ -44,6 +44,7 @@ outputs/raw/*.json
 outputs/processed/*.md
 outputs/logs/*.log
 outputs/*.json
+!outputs/comex_history.json
 outputs/digest_preview_*.html
 
 # Keep directory structure

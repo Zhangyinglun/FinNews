@@ -61,6 +61,27 @@ class RuleEngine:
         gold_data = self._find_ticker_data(price_data, "gold_futures", "GC=F")
         silver_data = self._find_ticker_data(price_data, "silver_futures", "SI=F")
 
+        # 诊断日志：记录每个ticker的查找结果
+        logger.debug(
+            f"Ticker查找结果: VIX={'找到' if vix_data else '未找到'} | "
+            f"DXY={'找到' if dxy_data else '未找到'} | "
+            f"US10Y={'找到' if us10y_data else '未找到'} | "
+            f"Gold={'找到' if gold_data else '未找到'} | "
+            f"Silver={'找到' if silver_data else '未找到'}"
+        )
+
+        # 数据完整性检查
+        missing_tickers = []
+        if not vix_data:
+            missing_tickers.append("VIX")
+        if not gold_data:
+            missing_tickers.append("黄金")
+        if not silver_data:
+            missing_tickers.append("白银")
+
+        if missing_tickers:
+            logger.warning(f"⚠️ 关键价格数据缺失: {', '.join(missing_tickers)}")
+
         # === VIX 分析 ===
         if vix_data:
             signal.vix_value = vix_data.get("price") or vix_data.get("current_price")
@@ -126,6 +147,8 @@ class RuleEngine:
 
         logger.info(
             f"规则引擎分析完成 | VIX={signal.vix_value} "
+            f"Gold={signal.gold_price} Silver={signal.silver_price} "
+            f"DXY={signal.dxy_value} US10Y={signal.us10y_value} | "
             f"Alert={signal.vix_alert_level.value} "
             f"Bias={signal.macro_bias.value} "
             f"Score={signal.sentiment_score:.2f} "
