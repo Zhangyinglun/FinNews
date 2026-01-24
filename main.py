@@ -37,6 +37,7 @@ def send_email_with_retry(
     to_list: list,
     max_retries: int = 3,
     logger=None,
+    images=None,
 ) -> bool:
     """
     带重试的邮件发送
@@ -49,6 +50,7 @@ def send_email_with_retry(
         to_list: 收件人列表
         max_retries: 最大重试次数
         logger: 日志记录器
+        images: 内嵌图片字典 {id: base64_data}
 
     Returns:
         发送是否成功
@@ -60,6 +62,7 @@ def send_email_with_retry(
                 html_body=html_body,
                 email_from=email_from,
                 to_list=to_list,
+                images=images,
             )
             if logger:
                 logger.info(f"📧 邮件发送成功: to={len(to_list)}")
@@ -337,9 +340,10 @@ def main():
                 logger.error(f"LLM响应JSON解析失败: {e}")
 
         # 使用模板渲染HTML
+        email_images = None
         if isinstance(digest_data, dict):
             email_subject = digest_data.get("subject", "")
-            email_html = digest_controller.render_email_html(
+            email_html, email_images = digest_controller.render_email_html(
                 digest_data=digest_data,
                 signal=market_signal,
                 data=multi_window_data,
@@ -348,6 +352,7 @@ def main():
         else:
             email_subject = ""
             email_html = ""
+            email_images = None
 
         # 备用方案
         if not email_subject:
@@ -367,6 +372,7 @@ def main():
     <li>宏观倾向: {market_signal.macro_bias.value}</li>
 </ul>
 </body></html>"""
+            email_images = None  # 备用模式无图片
 
         logger.info(f"✅ 邮件生成完成: {email_subject[:50]}...")
 
@@ -385,6 +391,7 @@ def main():
         </body>
         </html>
         """
+        email_images = None
 
     # ========================================
     # 8. 发送邮件 (3次重试)
@@ -415,6 +422,7 @@ def main():
         to_list=to_list,
         max_retries=3,
         logger=logger,
+        images=email_images,
     )
 
     # ========================================

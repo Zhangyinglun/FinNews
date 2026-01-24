@@ -258,7 +258,7 @@ class DigestController:
         signal: MarketSignal,
         data: MultiWindowData,
         comex_signal: Optional[ComexSignal] = None,
-    ) -> str:
+    ) -> Tuple[str, Optional[Dict[str, str]]]:
         """
         将LLM返回的JSON数据 + Python端数据 渲染为HTML邮件
 
@@ -269,11 +269,12 @@ class DigestController:
             comex_signal: COMEX库存信号 (可选)
 
         Returns:
-            完整的HTML邮件字符串
+            (完整的HTML邮件字符串, 嵌入图片字典 {cid: base64_data})
         """
         now = datetime.now()
+        images = {}
 
-        # VIX信号灯
+        # ... (VIX logic remains same)
         vix_emoji, vix_class, vix_status = self._get_vix_indicator(signal)
         vix_value = f"{signal.vix_value:.2f}" if signal.vix_value else "N/A"
         vix_change = (
@@ -353,7 +354,9 @@ class DigestController:
         analysis_html = self._render_analysis(analysis)
 
         # 构建COMEX库存区块
-        comex_section_html = self._render_comex_section(comex_signal)
+        comex_section_html, comex_images = self._render_comex_section(comex_signal)
+        if comex_images:
+            images.update(comex_images)
 
         # 邮件标题
         subject = digest_data.get("subject", self.get_email_subject(signal))
@@ -384,7 +387,7 @@ class DigestController:
             analysis=analysis_html,
         )
 
-        return html
+        return html, images
 
     def _render_news_list(self, news_list: List[Dict[str, str]]) -> str:
         """渲染新闻列表HTML (内联样式，Gmail兼容)"""
@@ -468,7 +471,9 @@ class DigestController:
         else:
             return "🟢", "comex-green", "正常", "#d4edda"
 
-    def _render_comex_section(self, comex_signal: Optional[ComexSignal]) -> str:
+    def _render_comex_section(
+        self, comex_signal: Optional[ComexSignal]
+    ) -> Tuple[str, Dict[str, str]]:
         """
         渲染COMEX库存监控区块HTML
 
@@ -476,10 +481,10 @@ class DigestController:
             comex_signal: COMEX信号对象 (可为None)
 
         Returns:
-            COMEX区块HTML字符串
+            (COMEX区块HTML字符串, 图片字典)
         """
         if comex_signal is None:
-            return ""
+            return "", {}
 
         emoji, css_class, status_text, bg_color = self._get_comex_indicator(
             comex_signal
@@ -554,7 +559,7 @@ class DigestController:
             </tr>""")
 
         if not silver_rows and not gold_rows:
-            return ""
+            return "", {}
 
         table_rows = "\n".join(silver_rows + gold_rows)
 
@@ -604,22 +609,32 @@ class DigestController:
 
         # 趋势图表
         charts_html = ""
+        images = {}
+
         if comex_signal.silver_chart_base64 or comex_signal.gold_chart_base64:
             chart_items = []
 
             if comex_signal.silver_chart_base64:
+                # 使用 CID 引用图片
+                cid = "silver_chart"
+                images[cid] = comex_signal.silver_chart_base64
+
                 chart_items.append(f"""
                     <div style="margin-bottom: 10px;">
-                        <img src="data:image/png;base64,{comex_signal.silver_chart_base64}" 
+                        <img src="cid:{cid}" 
                              alt="白银库存趋势" 
                              style="width: 100%; max-width: 560px; height: auto; border-radius: 4px;" />
                     </div>
                 """)
 
             if comex_signal.gold_chart_base64:
+                # 使用 CID 引用图片
+                cid = "gold_chart"
+                images[cid] = comex_signal.gold_chart_base64
+
                 chart_items.append(f"""
                     <div style="margin-bottom: 10px;">
-                        <img src="data:image/png;base64,{comex_signal.gold_chart_base64}" 
+                        <img src="cid:{cid}" 
                              alt="黄金库存趋势" 
                              style="width: 100%; max-width: 560px; height: auto; border-radius: 4px;" />
                     </div>
@@ -636,7 +651,8 @@ class DigestController:
                 f" (数据日期: {comex_signal.report_date.strftime('%Y-%m-%d')})"
             )
 
-        return f"""<!-- COMEX Inventory Section -->
+        return (
+            f"""<!-- COMEX Inventory Section -->
         <tr>
             <td style="padding: 0 16px 20px 16px;">
                 <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
@@ -656,7 +672,9 @@ class DigestController:
                     {charts_html}
                 </div>
             </td>
-        </tr>"""
+        </tr>""",
+            images,
+        )
 
 
 # ============================================================

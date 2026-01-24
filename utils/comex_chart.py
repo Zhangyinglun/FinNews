@@ -173,11 +173,14 @@ class ComexChartGenerator:
             max_scale = max_val + y_padding
 
             # 1. 绘制标题
-            metal_cn = "白银" if metal == "silver" else "黄金"
-            title = f"COMEX {metal_cn} Registered 库存趋势 ({days}天)"
+            metal_en = "Silver" if metal == "silver" else "Gold"
+            title = f"COMEX {metal_en} Registered Inventory ({days} Days)"
             # 居中标题
-            left, top, right, bottom = draw.textbbox((0, 0), title, font=title_font)
-            title_w = right - left
+            try:
+                left, top, right, bottom = draw.textbbox((0, 0), title, font=title_font)
+                title_w = right - left
+            except AttributeError:
+                title_w, _ = draw.textsize(title, font=title_font)
 
             draw.text(
                 ((self.width - title_w) / 2, 10),
@@ -253,79 +256,6 @@ class ComexChartGenerator:
                     font=label_font,
                 )
 
-            # 2. 绘制网格线和 Y 轴标签
-            # 绘制 5 条水平网格线
-            num_grid_lines = 5
-            for i in range(num_grid_lines):
-                val = min_scale + (max_scale - min_scale) * i / (num_grid_lines - 1)
-                y = self._get_y_pos(val, min_scale, max_scale)
-
-                # 网格线
-                draw.line(
-                    [(self.margin_left, y), (self.width - self.margin_right, y)],
-                    fill=grid_color,
-                    width=1,
-                )
-
-                # Y轴标签 (靠右对齐到 margin_left)
-                label = f"{val:.1f}M"
-                try:
-                    left, top, right, bottom = draw.textbbox(
-                        (0, 0), label, font=label_font
-                    )
-                    label_w = right - left
-                    label_h = bottom - top
-                except AttributeError:
-                    label_w, label_h = draw.textsize(label, font=label_font)
-
-                draw.text(
-                    (self.margin_left - label_w - 5, y - label_h / 2),
-                    label,
-                    fill=text_color,
-                    font=label_font,
-                )
-
-            # 3. 绘制数据线和点
-            points = []
-            for i, val in enumerate(values):
-                x = self._get_x_pos(i, len(values))
-                y = self._get_y_pos(val, min_scale, max_scale)
-                points.append((x, y))
-
-            # 绘制折线
-            if len(points) > 1:
-                draw.line(points, fill=line_color, width=2)
-
-            # 绘制数据点
-            dot_radius = 3
-            for x, y in points:
-                draw.ellipse(
-                    (x - dot_radius, y - dot_radius, x + dot_radius, y + dot_radius),
-                    fill=point_color,
-                )
-
-            # 4. 绘制 X 轴日期标签
-            # 根据数据点数量决定间隔
-            step = max(1, len(dates) // 7)
-            for i in range(0, len(dates), step):
-                x = self._get_x_pos(i, len(values))
-                date_str = dates[i].strftime("%m/%d")
-
-                try:
-                    left, top, right, bottom = draw.textbbox(
-                        (0, 0), date_str, font=label_font
-                    )
-                    w = right - left
-                except AttributeError:
-                    w, _ = draw.textsize(date_str, font=label_font)
-
-                draw.text(
-                    (x - w / 2, self.height - self.margin_bottom + 5),
-                    date_str,
-                    fill=text_color,
-                    font=label_font,
-                )
-
             # 5. 标注最新值
             last_x, last_y = points[-1]
             last_val = values[-1]
@@ -334,10 +264,10 @@ class ComexChartGenerator:
                 (last_x + 5, last_y - 10), label, fill=line_color, font=label_font
             )
 
-            # 输出为 Base64
+            # 输出为 Base64 (使用 encodebytes 以获得每 76 个字符的换行符，提高邮件兼容性)
             buffer = BytesIO()
             img.save(buffer, format="PNG")
-            img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            img_base64 = base64.encodebytes(buffer.getvalue()).decode("utf-8")
 
             logger.info(f"✅ {metal} 图表生成成功 (Pillow)")
             return img_base64
