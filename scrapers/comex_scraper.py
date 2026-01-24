@@ -288,6 +288,58 @@ class ComexScraper(BaseScraper):
             "prev_date": week_ago.get("date"),
         }
 
+    def _calculate_daily_change(
+        self, current_value: float, metal: str, value_type: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        计算日变化 (与前一天数据对比)
+
+        Args:
+            current_value: 当前值
+            metal: 金属类型
+            value_type: 数据类型 ("registered", "eligible", "total")
+
+        Returns:
+            包含变化量和百分比的字典
+        """
+        history = self._load_history()
+        key = f"{metal}_{value_type}"
+
+        # 查找历史记录
+        records = history.get(key, [])
+        if not records:
+            return None
+
+        # 找到前一天的记录 (允许1-3天误差，跳过周末)
+        now = datetime.now()
+        prev_day = None
+        for record in reversed(records):
+            try:
+                record_date = datetime.fromisoformat(record["date"])
+                days_diff = (now - record_date).days
+                if 1 <= days_diff <= 3:  # 1-3天前
+                    prev_day = record
+                    break
+            except (KeyError, ValueError):
+                continue
+
+        if prev_day is None:
+            return None
+
+        prev_value = prev_day.get("value")
+        if prev_value is None or prev_value == 0:
+            return None
+
+        change = current_value - prev_value
+        change_pct = (change / prev_value) * 100
+
+        return {
+            "change": change,
+            "change_percent": round(change_pct, 2),
+            "prev_value": prev_value,
+            "prev_date": prev_day.get("date"),
+        }
+
     def _update_history(self, metal: str, data: Dict[str, Any]) -> None:
         """
         更新历史数据 (保留30天)
@@ -364,6 +416,15 @@ class ComexScraper(BaseScraper):
                 data["registered_weekly_change"] = weekly["change"]
                 data["registered_weekly_change_pct"] = weekly["change_percent"]
 
+        # 计算日变化
+        if data.get("registered"):
+            daily = self._calculate_daily_change(
+                data["registered"], metal, "registered"
+            )
+            if daily:
+                data["registered_daily_change"] = daily["change"]
+                data["registered_daily_change_pct"] = daily["change_percent"]
+
         # 更新历史数据
         self._update_history(metal, data)
 
@@ -380,6 +441,8 @@ class ComexScraper(BaseScraper):
             "registered_change": data.get("registered_change"),
             "eligible_change": data.get("eligible_change"),
             "total_change": data.get("total_change"),
+            "registered_daily_change": data.get("registered_daily_change"),
+            "registered_daily_change_pct": data.get("registered_daily_change_pct"),
             "registered_weekly_change": data.get("registered_weekly_change"),
             "registered_weekly_change_pct": data.get("registered_weekly_change_pct"),
             "fetched_at": datetime.now(),

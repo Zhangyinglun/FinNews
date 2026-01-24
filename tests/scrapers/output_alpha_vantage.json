@@ -1,0 +1,13 @@
+[
+  {
+    "source": "AlphaVantage",
+    "pair": "USD/EUR",
+    "close": 0.8506,
+    "timestamp": "2026-01-22 00:00:00",
+    "fetched_at": "2026-01-23 13:54:54.584625",
+    "type": "fx_data",
+    "daily_label": "每日发布数据",
+    "fallback_allowed": true,
+    "fallback_note": "Alpha Vantage数据为每日发布，显示最近一次更新"
+  }
+]

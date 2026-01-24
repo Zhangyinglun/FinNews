@@ -282,6 +282,7 @@ class RuleEngine:
             registered = record.get("registered")
             registered_m = record.get("registered_million")
             total = record.get("total")
+            daily_change_pct = record.get("registered_daily_change_pct")
             weekly_change_pct = record.get("registered_weekly_change_pct")
             report_date = record.get("report_date")
 
@@ -292,6 +293,7 @@ class RuleEngine:
                 signal.silver_registered = registered
                 signal.silver_registered_million = registered_m
                 signal.silver_total = total
+                signal.silver_daily_change_pct = daily_change_pct
                 signal.silver_weekly_change_pct = weekly_change_pct
 
                 if registered is not None:
@@ -306,6 +308,7 @@ class RuleEngine:
                 signal.gold_registered = registered
                 signal.gold_registered_million = registered_m
                 signal.gold_total = total
+                signal.gold_daily_change_pct = daily_change_pct
                 signal.gold_weekly_change_pct = weekly_change_pct
 
                 if registered is not None:
@@ -315,6 +318,29 @@ class RuleEngine:
                     signal.gold_recommendation = alert_info["recommendation"]
                     if alert_info["is_emergency"]:
                         signal.has_emergency = True
+
+        # 生成趋势图表
+        silver_chart_base64 = None
+        gold_chart_base64 = None
+        try:
+            from pathlib import Path
+            from utils.comex_chart import ComexChartGenerator
+
+            history_file = Config.OUTPUT_DIR / "comex_history.json"
+            chart_gen = ComexChartGenerator(history_file)
+
+            charts = chart_gen.generate_all_charts(days=14)
+            signal.silver_chart_base64 = charts.get("silver_chart")
+            signal.gold_chart_base64 = charts.get("gold_chart")
+
+            if signal.silver_chart_base64 or signal.gold_chart_base64:
+                logger.info("✅ COMEX 趋势图表生成完成 (Pillow)")
+            else:
+                logger.warning("⚠️ COMEX 图表生成结果为空")
+
+        except Exception as e:
+            logger.warning(f"COMEX 图表生成失败: {e}")
+            # 图表生成失败不影响主流程
 
         # 记录日志
         worst_level = signal.get_worst_alert_level()

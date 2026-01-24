@@ -173,6 +173,9 @@ class ComexSignal(BaseModel):
     )
     silver_alert_message: str = Field(default="", description="白银预警消息")
     silver_recommendation: str = Field(default="", description="白银投资建议")
+    silver_daily_change_pct: Optional[float] = Field(
+        None, description="白银日变化百分比"
+    )
     silver_weekly_change_pct: Optional[float] = Field(
         None, description="白银周变化百分比"
     )
@@ -190,9 +193,14 @@ class ComexSignal(BaseModel):
     )
     gold_alert_message: str = Field(default="", description="黄金预警消息")
     gold_recommendation: str = Field(default="", description="黄金投资建议")
+    gold_daily_change_pct: Optional[float] = Field(None, description="黄金日变化百分比")
     gold_weekly_change_pct: Optional[float] = Field(
         None, description="黄金周变化百分比"
     )
+
+    # 图表 base64
+    silver_chart_base64: Optional[str] = Field(None, description="白银趋势图 base64")
+    gold_chart_base64: Optional[str] = Field(None, description="黄金趋势图 base64")
 
     # 报告日期
     report_date: Optional[datetime] = Field(None, description="CME报告日期")

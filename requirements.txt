@@ -18,8 +18,9 @@ xlrd==2.0.1                   # Excel解析器(COMEX数据)
 # Data Processing
 # ========================================
 pandas==2.2.3                 # 数据处理
-numpy==2.0.2                  # 数值计算
+numpy==1.26.4                 # 数值计算
 python-dateutil==2.9.0        # 日期处理
+Pillow>=10.0.0                # 图像处理 (COMEX图表)
 
 # ========================================
 # Data Models

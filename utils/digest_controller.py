@@ -495,7 +495,16 @@ class DigestController:
                 ComexAlertLevel.SAFE: "🟢",
             }.get(comex_signal.silver_alert_level, "")
 
+            daily_str = ""
             weekly_str = ""
+            if comex_signal.silver_daily_change_pct is not None:
+                change_color = (
+                    "#28a745"
+                    if comex_signal.silver_daily_change_pct >= 0
+                    else "#dc3545"
+                )
+                daily_str = f'<span style="color: {change_color}; font-weight: 500;">({comex_signal.silver_daily_change_pct:+.1f}% 日)</span>'
+
             if comex_signal.silver_weekly_change_pct is not None:
                 change_color = (
                     "#28a745"
@@ -504,10 +513,12 @@ class DigestController:
                 )
                 weekly_str = f'<span style="color: {change_color}; font-weight: 500;">({comex_signal.silver_weekly_change_pct:+.1f}% 周)</span>'
 
+            change_str = " ".join(filter(None, [daily_str, weekly_str]))
+
             silver_rows.append(f"""<tr>
                 <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">白银 (Registered)</td>
                 <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.silver_registered_million:.2f}M oz</td>
-                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{silver_emoji} {weekly_str}</td>
+                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{silver_emoji} {change_str}</td>
             </tr>""")
 
         # 构建黄金行
@@ -520,17 +531,26 @@ class DigestController:
                 ComexAlertLevel.SAFE: "🟢",
             }.get(comex_signal.gold_alert_level, "")
 
+            daily_str = ""
             weekly_str = ""
+            if comex_signal.gold_daily_change_pct is not None:
+                change_color = (
+                    "#28a745" if comex_signal.gold_daily_change_pct >= 0 else "#dc3545"
+                )
+                daily_str = f'<span style="color: {change_color}; font-weight: 500;">({comex_signal.gold_daily_change_pct:+.1f}% 日)</span>'
+
             if comex_signal.gold_weekly_change_pct is not None:
                 change_color = (
                     "#28a745" if comex_signal.gold_weekly_change_pct >= 0 else "#dc3545"
                 )
                 weekly_str = f'<span style="color: {change_color}; font-weight: 500;">({comex_signal.gold_weekly_change_pct:+.1f}% 周)</span>'
 
+            change_str = " ".join(filter(None, [daily_str, weekly_str]))
+
             gold_rows.append(f"""<tr>
                 <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">黄金 (Registered)</td>
                 <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.gold_registered_million:.2f}M oz</td>
-                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{gold_emoji} {weekly_str}</td>
+                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{gold_emoji} {change_str}</td>
             </tr>""")
 
         if not silver_rows and not gold_rows:
@@ -582,6 +602,33 @@ class DigestController:
                 {rec_items}
             </div>"""
 
+        # 趋势图表
+        charts_html = ""
+        if comex_signal.silver_chart_base64 or comex_signal.gold_chart_base64:
+            chart_items = []
+
+            if comex_signal.silver_chart_base64:
+                chart_items.append(f"""
+                    <div style="margin-bottom: 10px;">
+                        <img src="data:image/png;base64,{comex_signal.silver_chart_base64}" 
+                             alt="白银库存趋势" 
+                             style="width: 100%; max-width: 560px; height: auto; border-radius: 4px;" />
+                    </div>
+                """)
+
+            if comex_signal.gold_chart_base64:
+                chart_items.append(f"""
+                    <div style="margin-bottom: 10px;">
+                        <img src="data:image/png;base64,{comex_signal.gold_chart_base64}" 
+                             alt="黄金库存趋势" 
+                             style="width: 100%; max-width: 560px; height: auto; border-radius: 4px;" />
+                    </div>
+                """)
+
+            charts_html = f"""<div style="padding: 12px; background-color: #fafafa; border-top: 1px solid #e9ecef;">
+                {"".join(chart_items)}
+            </div>"""
+
         # 报告日期
         report_date_str = ""
         if comex_signal.report_date:
@@ -606,6 +653,7 @@ class DigestController:
                     </table>
                     {alert_html}
                     {rec_html}
+                    {charts_html}
                 </div>
             </td>
         </tr>"""
