@@ -39,6 +39,9 @@ env/
 *.swn
 .DS_Store
 
+# Git worktrees
+.worktrees/
+
 # Outputs
 outputs/raw/*.json
 outputs/processed/*.md
