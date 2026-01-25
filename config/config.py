@@ -128,6 +128,7 @@ class Config:
     # 数据源开关
     # ========================================
     ENABLE_TAVILY = _getenv_bool("ENABLE_TAVILY", "true")
+    ENABLE_DDG = _getenv_bool("ENABLE_DDG", "true")
     ENABLE_YFINANCE = _getenv_bool("ENABLE_YFINANCE", "true")
     ENABLE_RSS = _getenv_bool("ENABLE_RSS", "true")
     ENABLE_FRED = _getenv_bool("ENABLE_FRED", "true")
@@ -150,6 +151,9 @@ class Config:
         "fxstreet_commodities": "https://www.fxstreet.com/rss/news/commodities/gold",
         "investing_commodities": "https://www.investing.com/rss/commodities.rss",
         "zerohedge": "http://feeds.feedburner.com/zerohedge/feed",
+        "kitco_gold": "https://www.kitco.com/rss/category/commodities/gold",
+        "cnbc_commodities": "https://www.cnbc.com/id/10000086/device/rss/rss.html",
+        "dailyfx_market_news": "https://www.dailyfx.com/feeds/market-news",
     }
 
     # ========================================

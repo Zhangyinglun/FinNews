@@ -60,6 +60,10 @@ class Deduplicator:
                 except:
                     timestamp = datetime.now()
 
+            # 确保时间戳没有时区信息(naive)，以便与 datetime.now() 比较
+            if timestamp.tzinfo is not None:
+                timestamp = timestamp.replace(tzinfo=None)
+
             if content_hash not in self.seen_hashes and timestamp > cutoff_time:
                 self.seen_hashes.add(content_hash)
                 unique_records.append(record)

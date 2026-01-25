@@ -17,6 +17,7 @@ from scrapers import (
     AlphaVantageScraper,
     EtfScraper,
     ComexScraper,
+    DuckDuckGoScraper,
 )
 from scrapers.content_fetcher import ContentFetcher
 from processors import DataCleaner, Deduplicator
@@ -108,6 +109,13 @@ def main():
             logger.info("  ✓ Tavily 爬虫就绪")
         except Exception as e:
             logger.warning(f"  ✗ Tavily爬虫初始化失败: {e}")
+
+    if Config.ENABLE_DDG:
+        try:
+            scrapers.append(DuckDuckGoScraper())
+            logger.info("  ✓ DuckDuckGo 爬虫就绪")
+        except Exception as e:
+            logger.warning(f"  ✗ DuckDuckGo爬虫初始化失败: {e}")
 
     if Config.ENABLE_YFINANCE:
         try:
