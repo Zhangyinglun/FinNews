@@ -8,7 +8,7 @@ from typing import Dict, List
 
 os.environ["OPENROUTER_API_KEY"] = "dummy"
 
-sys.path.insert(0, "D:\\Projects\\FinNews\\.worktrees\\plan-sonar-scraper-review")
+sys.path.insert(0, "D:\\Projects\\FinNews")
 
 from config.config import Config
 from scrapers.sonar_scraper import SonarScraper
@@ -107,6 +107,27 @@ def test_sonar_scraper_trusted_domain_case_insensitive():
         _restore_config(backup)
 
 
+def test_sonar_scraper_trusted_domain_accepts_url_without_scheme():
+    """可信域应支持无 scheme 的 URL"""
+    backup = _backup_config()
+    try:
+        Config.SONAR_USE_TRUSTED_DOMAINS = True
+        Config.TRUSTED_DOMAINS = ["reuters.com"]
+
+        citations = [
+            Citation(url="reuters.com/article/abc", title="Reuters"),
+            Citation(url="example.com/x", title="Example"),
+        ]
+
+        scraper = SonarScraper()
+        scraper.client = FakeClient(citations)
+
+        results = scraper._fetch_window(["gold"], "flash")
+        assert len(results) == 1, "无 scheme URL 应按可信域过滤"
+    finally:
+        _restore_config(backup)
+
+
 def test_sonar_scraper_filter_disabled_keeps_all():
     """关闭过滤时应保留所有引用"""
     backup = _backup_config()
@@ -132,4 +153,5 @@ if __name__ == "__main__":
     test_sonar_scraper_trusted_domain_filter_and_fields()
     test_sonar_scraper_trusted_domain_allows_subdomain_and_port()
     test_sonar_scraper_trusted_domain_case_insensitive()
+    test_sonar_scraper_trusted_domain_accepts_url_without_scheme()
     test_sonar_scraper_filter_disabled_keeps_all()

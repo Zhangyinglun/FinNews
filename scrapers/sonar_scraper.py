@@ -95,7 +95,12 @@ class SonarScraper(BaseScraper):
 
     @staticmethod
     def _is_trusted_domain(url: str, trusted_domains: List[str]) -> bool:
-        hostname = urlparse(url).hostname or ""
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        if not hostname and "://" not in url:
+            parsed = urlparse(f"https://{url}")
+            hostname = parsed.hostname
+        hostname = hostname or ""
         domain = hostname.lower()
         if not domain:
             return False
