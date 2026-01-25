@@ -156,12 +156,16 @@ class SonarScraper(BaseScraper):
                 time.sleep(0.5)
 
             except SonarError as e:
-                self.logger.warning(
-                    f"[{window_type}] Sonar 查询失败 '{query[:30]}...': {e}"
+                self.logger.error(
+                    f"[{window_type}] Sonar 查询失败 '{query[:30]}...': {e}",
+                    exc_info=True,
                 )
                 continue
             except Exception as e:
-                self.logger.warning(f"[{window_type}] 查询异常 '{query[:30]}...': {e}")
+                self.logger.error(
+                    f"[{window_type}] 查询异常 '{query[:30]}...': {e}",
+                    exc_info=True,
+                )
                 continue
 
         return results
