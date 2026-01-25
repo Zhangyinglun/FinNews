@@ -250,6 +250,9 @@ class Config:
         "fxstreet.com",
     ]
 
+    # Sonar 引用过滤开关
+    SONAR_USE_TRUSTED_DOMAINS = _getenv_bool("SONAR_USE_TRUSTED_DOMAINS", "false")
+
     # ========================================
     # FRED经济指标系列ID
     # ========================================
