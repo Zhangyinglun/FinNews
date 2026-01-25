@@ -24,7 +24,7 @@ class SonarScraper(BaseScraper):
     复用 Tavily 的关键词池，支持 Flash/Cycle/Trend 三种时间窗口。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("Sonar")
 
         # 检查 API 密钥
@@ -95,8 +95,15 @@ class SonarScraper(BaseScraper):
 
     @staticmethod
     def _is_trusted_domain(url: str, trusted_domains: List[str]) -> bool:
-        domain = urlparse(url).netloc.lower()
-        return any(domain == d or domain.endswith("." + d) for d in trusted_domains)
+        hostname = urlparse(url).hostname or ""
+        domain = hostname.lower()
+        if not domain:
+            return False
+        normalized_domains = [d.lower() for d in trusted_domains if d]
+        return any(
+            domain == trusted or domain.endswith("." + trusted)
+            for trusted in normalized_domains
+        )
 
     def _fetch_window(
         self,
@@ -136,6 +143,9 @@ class SonarScraper(BaseScraper):
                         if not self._is_trusted_domain(
                             citation.url, Config.TRUSTED_DOMAINS
                         ):
+                            self.logger.debug(
+                                f"[{window_type}] 过滤不可信引用: {citation.url}"
+                            )
                             continue
 
                     record = self._create_base_record(
