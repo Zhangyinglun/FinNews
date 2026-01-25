@@ -57,7 +57,7 @@ class SonarClient:
         max_retries: int = 3,
         http_referer: Optional[str] = None,
         x_title: Optional[str] = None,
-    ):
+    ) -> None:
         """
         初始化 Sonar 客户端
 
@@ -162,7 +162,10 @@ class SonarClient:
                 if attempt >= self.max_retries:
                     break
                 wait_s = min(2 ** (attempt - 1), 8)
-                self.logger.warning(f"请求失败: {exc}, 等待 {wait_s}s 后重试...")
+                self.logger.warning(
+                    f"请求失败: {exc}, 等待 {wait_s}s 后重试...",
+                    exc_info=True,
+                )
                 time.sleep(wait_s)
 
         raise SonarError(f"Sonar 请求失败: {last_error}")
@@ -223,7 +226,7 @@ class SonarClient:
             )
 
         except Exception as e:
-            self.logger.error(f"Sonar 响应解析失败: {e}")
+            self.logger.error(f"Sonar 响应解析失败: {e}", exc_info=True)
             return SonarSearchResult(
                 answer="",
                 citations=[],

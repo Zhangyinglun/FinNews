@@ -1,11 +1,15 @@
 """
-测试 SonarClient 提示词与 payload 构建
+测试 SonarClient 提示词、响应解析与异常日志
 """
 
 import sys
+from unittest.mock import Mock
+
+import requests
 
 sys.path.insert(0, "D:\\Projects\\FinNews")
 
+from utils import sonar_client
 from utils.sonar_client import SonarClient
 
 
@@ -19,5 +23,85 @@ def test_build_payload_contains_citations_requirement():
     )
 
 
+def test_parse_response_citations_from_strings():
+    """解析 citations 字符串数组"""
+    client = SonarClient(api_key="dummy")
+    response = {
+        "choices": [
+            {
+                "message": {
+                    "content": "摘要",
+                    "citations": [
+                        "https://example.com/a",
+                        "https://example.com/b",
+                    ],
+                }
+            }
+        ]
+    }
+    result = client._parse_response(response)
+    assert result.answer == "摘要"
+    assert [c.url for c in result.citations] == [
+        "https://example.com/a",
+        "https://example.com/b",
+    ]
+
+
+def test_parse_response_citations_from_dicts():
+    """解析 citations 字典数组"""
+    client = SonarClient(api_key="dummy")
+    response = {
+        "choices": [
+            {
+                "message": {
+                    "content": "摘要",
+                    "citations": [
+                        {"url": "https://example.com/a", "title": "A"},
+                        {"url": "https://example.com/b", "title": "B"},
+                    ],
+                }
+            }
+        ]
+    }
+    result = client._parse_response(response)
+    assert [c.url for c in result.citations] == [
+        "https://example.com/a",
+        "https://example.com/b",
+    ]
+    assert [c.title for c in result.citations] == ["A", "B"]
+
+
+def test_parse_response_logs_exception_with_stack():
+    """解析异常必须记录完整堆栈"""
+    client = SonarClient(api_key="dummy")
+    client.logger.error = Mock()
+    response = {"choices": [None]}
+    result = client._parse_response(response)
+    assert result.answer == ""
+    assert result.citations == []
+    client.logger.error.assert_called_once()
+    _, kwargs = client.logger.error.call_args
+    assert kwargs.get("exc_info") is True
+
+
+def test_search_logs_request_exception_with_stack():
+    """请求异常必须记录完整堆栈"""
+    client = SonarClient(api_key="dummy", max_retries=2)
+    client.session.post = Mock(side_effect=requests.exceptions.RequestException("x"))
+    client.logger.warning = Mock()
+    sonar_client.time.sleep = Mock()
+    try:
+        client.search("gold news", max_tokens=8)
+    except Exception:
+        pass
+    client.logger.warning.assert_called_once()
+    _, kwargs = client.logger.warning.call_args
+    assert kwargs.get("exc_info") is True
+
+
 if __name__ == "__main__":
     test_build_payload_contains_citations_requirement()
+    test_parse_response_citations_from_strings()
+    test_parse_response_citations_from_dicts()
+    test_parse_response_logs_exception_with_stack()
+    test_search_logs_request_exception_with_stack()
