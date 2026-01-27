@@ -119,6 +119,13 @@ def main():
         except Exception as e:
             logger.warning(f"  ✗ DuckDuckGo爬虫初始化失败: {e}")
 
+    if Config.ENABLE_SONAR:
+        try:
+            scrapers.append(SonarScraper())
+            logger.info("  ✓ Sonar 爬虫就绪")
+        except Exception as e:
+            logger.warning(f"  ✗ Sonar爬虫初始化失败: {e}")
+
     if Config.ENABLE_YFINANCE:
         try:
             scrapers.append(YFinanceScraper())
