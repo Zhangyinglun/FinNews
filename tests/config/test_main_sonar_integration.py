@@ -2,15 +2,11 @@
 
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews\\.worktrees\\sonar-integration")
+sys.path.insert(0, "D:\\Projects\\FinNews")
 
 
 def test_main_contains_sonar_scraper():
-    with open(
-        "D:\\Projects\\FinNews\\.worktrees\\sonar-integration\\main.py",
-        "r",
-        encoding="utf-8",
-    ) as f:
+    with open("D:\\Projects\\FinNews\\main.py", "r", encoding="utf-8") as f:
         content = f.read()
     assert "SonarScraper" in content
 
