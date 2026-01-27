@@ -46,7 +46,9 @@ env/
 outputs/raw/*.json
 outputs/processed/*.md
 outputs/logs/*.log
+outputs/storage/*.json
 outputs/*.json
+
 !outputs/comex_history.json
 outputs/digest_preview_*.html
 

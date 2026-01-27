@@ -11,6 +11,15 @@ from config.config import Config
 from utils.logger import setup_logger
 
 
+def test_sonar_config_defaults():
+    """Sonar 配置项默认存在"""
+    from config.config import Config
+
+    assert hasattr(Config, "ENABLE_SONAR")
+    assert hasattr(Config, "SONAR_MODEL")
+    assert hasattr(Config, "SONAR_USE_TRUSTED_DOMAINS")
+
+
 def test_config_values():
     """测试配置值是否正确加载"""
     setup_logger()
@@ -149,6 +158,7 @@ def test_fred_series():
 
 
 if __name__ == "__main__":
+    test_sonar_config_defaults()
     test_config_values()
     test_api_keys()
     test_validation()

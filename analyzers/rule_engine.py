@@ -145,6 +145,17 @@ class RuleEngine:
 
         signal.alert_messages = alerts
 
+        # 检查是否包含缓存数据并记录来源备注
+        fallback_sources = []
+        for d in [vix_data, dxy_data, us10y_data, gold_data, silver_data]:
+            if d and d.get("is_fallback"):
+                fallback_sources.append(d.get("ticker_name", "Unknown"))
+
+        if fallback_sources:
+            signal.price_source_note = (
+                f"注：{', '.join(fallback_sources)} 数据获取失败，已回退至最近缓存值"
+            )
+
         logger.info(
             f"规则引擎分析完成 | VIX={signal.vix_value} "
             f"Gold={signal.gold_price} Silver={signal.silver_price} "

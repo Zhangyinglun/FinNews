@@ -291,6 +291,7 @@ class DigestController:
 
         # 构建价格表行
         price_rows = []
+        has_any_value = False
         price_data = [
             ("黄金 (XAU)", signal.gold_price, signal.gold_change_percent, "$", ""),
             ("白银 (XAG)", signal.silver_price, signal.silver_change_percent, "$", ""),
@@ -302,32 +303,41 @@ class DigestController:
         for name, value, change, prefix, suffix in price_data:
             if value is not None:
                 value_str = f"{prefix}{value:.2f}{suffix}"
-                if change is not None:
-                    change_color = "#28a745" if change >= 0 else "#dc3545"
-                    change_str = f'<span style="color: {change_color}; font-weight: 500;">{change:+.2f}%</span>'
-                else:
-                    change_str = "-"
-                price_rows.append(f"""<tr>
-                    <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">{name}</td>
-                    <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{value_str}</td>
-                    <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{change_str}</td>
-                </tr>""")
+                has_any_value = True
+            else:
+                value_str = "N/A"
 
-        # 防御性编程：如果所有价格数据都缺失，显示警告信息
-        if not price_rows:
+            if change is not None:
+                change_color = "#28a745" if change >= 0 else "#dc3545"
+                change_str = f'<span style="color: {change_color}; font-weight: 500;">{change:+.2f}%</span>'
+            else:
+                change_str = "-"
+
+            price_rows.append(f"""<tr>
+                <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">{name}</td>
+                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{value_str}</td>
+                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{change_str}</td>
+            </tr>""")
+
+        # 防御性编程：如果所有价格数据都缺失，仅记录日志
+        if not has_any_value:
             import logging
 
             logger = logging.getLogger(__name__)
             logger.warning("⚠️ 价格表数据全部缺失！signal对象中的价格字段都为None")
-            price_rows.append(f"""<tr>
-                <td colspan="3" style="padding: 20px 12px; text-align: center; color: #dc3545; border-bottom: 1px solid #f0f0f0;">
-                    ⚠️ 价格数据暂时不可用，请稍后查看
-                </td>
-            </tr>""")
 
         price_table_html = "\n".join(price_rows)
 
+        # 添加价格来源备注 (如果有)
+        if signal.price_source_note:
+            price_table_html += f"""<tr>
+                <td colspan="3" style="padding: 10px 12px; font-size: 14px; color: #666; font-style: italic; border-bottom: 1px solid #f0f0f0;">
+                    {signal.price_source_note}
+                </td>
+            </tr>"""
+
         # 构建经济指标独立板块
+
         econ_items = []
         if data.cycle.cpi_actual:
             econ_items.append(f"CPI: {data.cycle.cpi_actual}")

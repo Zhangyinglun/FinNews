@@ -73,6 +73,9 @@ class MarketSignal(BaseModel):
     # 综合判断
     macro_bias: MacroBias = Field(default=MacroBias.NEUTRAL, description="宏观倾向判断")
     sentiment_score: float = Field(default=0.0, description="情感评分 (-1.0到1.0)")
+    price_source_note: Optional[str] = Field(
+        None, description="价格数据来源备注 (如: 含缓存数据)"
+    )
 
     # 警报信息
     alert_messages: List[str] = Field(default_factory=list, description="警报消息列表")

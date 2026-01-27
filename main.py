@@ -18,6 +18,7 @@ from scrapers import (
     EtfScraper,
     ComexScraper,
     DuckDuckGoScraper,
+    StooqScraper,
 )
 from scrapers.content_fetcher import ContentFetcher
 from processors import DataCleaner, Deduplicator
@@ -28,6 +29,7 @@ from analyzers.market_analyzer import MarketAnalyzer
 from utils.digest_controller import DigestController, DIGEST_JSON_SCHEMA
 from utils.mailer import GmailSmtpMailer
 from utils.openrouter_client import OpenRouterClient
+from utils.price_cache_manager import PriceCacheManager
 
 
 def send_email_with_retry(
@@ -185,8 +187,65 @@ def main():
     logger.info(f"✅ 数据采集完成 - 总计 {len(all_data)} 条原始记录")
 
     # ========================================
+    # 3.5 价格数据补全 (Failover Pipeline)
+    # ========================================
+    logger.info("=" * 50)
+    logger.info("🛠️ 价格数据补全 (Failover)...")
+
+    cache_manager = PriceCacheManager()
+    required_tickers = list(Config.YFINANCE_TICKERS.keys())
+
+    # 检查当前已获取的价格数据
+    existing_prices = {
+        r.get("ticker_name")
+        for r in all_data
+        if r.get("type") == "price_data" and r.get("price", 0) > 0
+    }
+    missing_tickers = [t for t in required_tickers if t not in existing_prices]
+
+    if missing_tickers:
+        logger.warning(f"  ⚠️ 缺失价格数据: {missing_tickers}，尝试 Stooq 兜底...")
+        stooq = StooqScraper()
+        # 修改 stooq 的 tickers 仅包含缺失的部分
+        stooq.tickers = {
+            k: v for k, v in Config.STOOQ_TICKERS.items() if k in missing_tickers
+        }
+        stooq_data = stooq.run()
+
+        if stooq_data:
+            all_data.extend(stooq_data)
+            # 重新检查
+            existing_prices.update(
+                {
+                    r.get("ticker_name")
+                    for r in stooq_data
+                    if r.get("type") == "price_data" and r.get("price", 0) > 0
+                }
+            )
+            missing_tickers = [t for t in required_tickers if t not in existing_prices]
+
+    if missing_tickers:
+        logger.warning(f"  ⚠️ 仍缺失价格数据: {missing_tickers}，尝试本地缓存回退...")
+        fallback_data = cache_manager.get_fallback_records(missing_tickers)
+        if fallback_data:
+            all_data.extend(fallback_data)
+            logger.info(f"  ✓ 已从缓存恢复 {len(fallback_data)} 条价格记录")
+    else:
+        logger.info("  ✓ 所有关键价格数据已就绪 (Real-time)")
+
+    # 更新缓存 (使用本次运行中所有有效的实时数据)
+    fresh_prices = [
+        r
+        for r in all_data
+        if r.get("type") == "price_data" and not r.get("is_fallback")
+    ]
+    if fresh_prices:
+        cache_manager.update(fresh_prices)
+
+    # ========================================
     # 4. 数据清洗和去重
     # ========================================
+
     logger.info("=" * 50)
     logger.info("🧹 数据清洗和去重...")
 

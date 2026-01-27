@@ -250,7 +250,9 @@ class Config:
         "fxstreet.com",
     ]
 
-    # Sonar 引用过滤开关
+    # Sonar 配置
+    ENABLE_SONAR = _getenv_bool("ENABLE_SONAR", "false")
+    SONAR_MODEL = _getenv_str("SONAR_MODEL", "perplexity/sonar")
     SONAR_USE_TRUSTED_DOMAINS = _getenv_bool("SONAR_USE_TRUSTED_DOMAINS", "false")
 
     # ========================================
