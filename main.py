@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 
 from utils.logger import setup_logger
+from utils.pipeline_monitor import PipelineMonitor
 from scrapers import (
     TavilyScraper,
     YFinanceScraper,
@@ -86,6 +87,7 @@ def send_email_with_retry(
 def main():
     """主函数 - 单次执行全流程"""
     logger = setup_logger()
+    monitor = PipelineMonitor()
     logger.info("🚀 FinNews 数据管道启动...")
     logger.info(f"⏰ 执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -93,14 +95,19 @@ def main():
     # 1. 验证配置
     # ========================================
     try:
+        monitor.start_step("环境验证")
+        start_time = time.time()
         Config.validate()
         logger.info("✅ 配置验证通过")
+        monitor.report_module("配置验证", True, duration=time.time()-start_time)
     except ValueError as e:
         logger.error(f"❌ 配置错误: {e}")
+        monitor.report_module("配置验证", False, error=str(e))
         logger.error("请检查.env文件中的API密钥和邮件配置")
         sys.exit(1)
 
     # ========================================
+    monitor.start_step("初始化数据源")
     # 2. 初始化数据源
     # ========================================
     scrapers = []
@@ -177,6 +184,7 @@ def main():
     logger.info(f"📡 已初始化 {len(scrapers)} 个数据源")
 
     # ========================================
+    monitor.start_step("数据采集")
     # 3. 数据采集
     # ========================================
     logger.info("=" * 50)
@@ -184,16 +192,20 @@ def main():
     all_data = []
 
     for scraper in scrapers:
+        start_time = time.time()
         try:
             data = scraper.run()
             all_data.extend(data)
             logger.info(f"  → {scraper.name}: {len(data)} 条记录")
+            monitor.report_module(scraper.name, True, count=len(data), duration=time.time()-start_time)
         except Exception as e:
             logger.error(f"  → {scraper.name} 采集失败: {e}")
+            monitor.report_module(scraper.name, False, error=str(e), duration=time.time()-start_time)
 
     logger.info(f"✅ 数据采集完成 - 总计 {len(all_data)} 条原始记录")
 
     # ========================================
+    monitor.start_step("价格数据补全")
     # 3.5 价格数据补全 (Failover Pipeline)
     # ========================================
     logger.info("=" * 50)
@@ -250,6 +262,7 @@ def main():
         cache_manager.update(fresh_prices)
 
     # ========================================
+    monitor.start_step("数据处理")
     # 4. 数据清洗和去重
     # ========================================
 
@@ -259,10 +272,14 @@ def main():
     cleaner = DataCleaner()
     deduplicator = Deduplicator()
 
+    start_time = time.time()
     cleaned_data = cleaner.clean(all_data)
+    monitor.report_module("DataCleaner", True, count=len(cleaned_data), duration=time.time()-start_time)
     logger.info(f"  → 清洗后: {len(cleaned_data)} 条")
 
+    start_time = time.time()
     unique_data = deduplicator.deduplicate(cleaned_data)
+    monitor.report_module("Deduplicator", True, count=len(unique_data), duration=time.time()-start_time)
     logger.info(f"  → 去重后: {len(unique_data)} 条")
 
     # 抓取完整新闻内容
@@ -346,6 +363,7 @@ def main():
     )
 
     # ========================================
+    monitor.start_step("邮件生成")
     # 7. 构建LLM输入并生成邮件
     # ========================================
     logger.info("=" * 50)
@@ -386,6 +404,7 @@ def main():
 - 严格按照JSON Schema返回结果"""
 
     try:
+        start_time = time.time()
         resp = client.chat_completions(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -453,9 +472,11 @@ def main():
             email_images = None  # 备用模式无图片
 
         logger.info(f"✅ 邮件生成完成: {email_subject[:50]}...")
+        monitor.report_module("LLM_Chat", True, duration=time.time()-start_time)
 
     except Exception as e:
         logger.error(f"LLM调用失败: {e}", exc_info=True)
+        monitor.report_module("LLM_Chat", False, error=str(e), duration=time.time()-start_time)
         # 生成错误通知邮件
         email_subject = (
             f"【系统错误】FinNews {datetime.now().strftime('%m/%d')} 生成失败"
@@ -472,6 +493,7 @@ def main():
         email_images = None
 
     # ========================================
+    monitor.start_step("邮件发送")
     # 8. 发送邮件 (3次重试)
     # ========================================
     logger.info("=" * 50)
@@ -492,6 +514,7 @@ def main():
         use_tls=Config.SMTP_USE_TLS,
     )
 
+    start_time = time.time()
     email_sent = send_email_with_retry(
         mailer=mailer,
         subject=email_subject,
@@ -502,12 +525,14 @@ def main():
         logger=logger,
         images=email_images,
     )
+    monitor.report_module("GmailSmtpMailer", email_sent, duration=time.time()-start_time)
 
     # ========================================
     # 9. 完成
     # ========================================
     logger.info("=" * 50)
 
+    logger.info(monitor.get_summary())
     if email_sent:
         logger.info("🎉 FinNews 执行完成!")
         logger.info(f"📧 邮件已发送至: {', '.join(to_list)}")
