@@ -12,7 +12,10 @@ from config.config import Config
 from utils.logger import setup_logger
 
 
-def _apply_env_overrides(env_overrides: dict[str, str], unset_keys: list[str]):
+def _apply_env_overrides(
+    env_overrides: dict[str, str],
+    unset_keys: list[str],
+) -> dict[str, str | None]:
     original_env = {}
     for key in set(unset_keys) | set(env_overrides.keys()):
         original_env[key] = os.environ.get(key)
@@ -23,7 +26,7 @@ def _apply_env_overrides(env_overrides: dict[str, str], unset_keys: list[str]):
     return original_env
 
 
-def _restore_env_overrides(original_env: dict[str, str | None]):
+def _restore_env_overrides(original_env: dict[str, str | None]) -> None:
     for key, value in original_env.items():
         if value is None:
             os.environ.pop(key, None)
@@ -31,7 +34,7 @@ def _restore_env_overrides(original_env: dict[str, str | None]):
             os.environ[key] = value
 
 
-def _reload_config():
+def _reload_config() -> type[Config]:
     import config.config as config_module
 
     reloaded_module = importlib.reload(config_module)
@@ -39,7 +42,7 @@ def _reload_config():
     return reloaded_module.Config
 
 
-def test_sonar_config_defaults():
+def test_sonar_config_defaults() -> None:
     """Sonar 配置项默认值正确"""
     assert hasattr(Config, "ENABLE_SONAR")
     assert hasattr(Config, "SONAR_MODEL")
@@ -63,7 +66,7 @@ def test_sonar_config_defaults():
         _reload_config()
 
 
-def test_sonar_config_env_override():
+def test_sonar_config_env_override() -> None:
     """Sonar 配置项支持环境变量覆盖"""
     original_env = _apply_env_overrides(
         {

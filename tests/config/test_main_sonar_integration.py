@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, "D:\\Projects\\FinNews")
 
 
-def test_main_contains_sonar_scraper():
+def test_main_contains_sonar_scraper() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     main_path = repo_root / "main.py"
     with open(main_path, "r", encoding="utf-8") as f:

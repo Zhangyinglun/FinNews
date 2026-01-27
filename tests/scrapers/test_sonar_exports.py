@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, "D:\\Projects\\FinNews")
 
 
-def test_sonar_scraper_export():
+def test_sonar_scraper_export() -> None:
     import scrapers
     from scrapers import SonarScraper
 
