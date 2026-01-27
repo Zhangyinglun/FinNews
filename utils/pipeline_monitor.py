@@ -10,7 +10,7 @@ class ModuleStatus:
     name: str
     status: str = "PENDING"  # PENDING, SUCCESS, FAILED, WARNING
     error: Optional[str] = None
-    count: int = 0
+    count: Optional[int] = None
     duration: float = 0.0
 
 
@@ -41,7 +41,7 @@ class PipelineMonitor:
         name: str,
         success: bool,
         error: Optional[str] = None,
-        count: int = 0,
+        count: Optional[int] = None,
         duration: float = 0.0,
         warning: bool = False,
     ):
@@ -77,7 +77,7 @@ class PipelineMonitor:
                     if m.status == "SUCCESS"
                     else "⚠️" if m.status == "WARNING" else "❌"
                 )
-                count_str = f" ({m.count} 条记录)" if m.count > 0 else ""
+                count_str = f" ({m.count} 条记录)" if m.count is not None else ""
                 lines.append(
                     f"  {status_icon} {m.name:.<35} {m.status}{count_str} [{m.duration:.2f}s]"
                 )

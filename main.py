@@ -301,7 +301,9 @@ def main():
     # 抓取完整新闻内容
     content_fetcher = ContentFetcher()
     logger.info(f"🔍 抓取 {len(unique_data)} 条新闻的完整内容...")
+    start_time = time.time()
     enriched_data = content_fetcher.enrich_articles(unique_data)
+    monitor.report_module("ContentFetcher", True, count=len(enriched_data), duration=time.time()-start_time)
 
     # 存储原始数据和处理后数据
     storage = JSONStorage()
