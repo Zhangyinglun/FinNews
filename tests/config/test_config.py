@@ -4,6 +4,7 @@
 
 import sys
 import os
+import importlib
 
 sys.path.insert(0, "D:\\Projects\\FinNews")
 
@@ -11,13 +12,75 @@ from config.config import Config
 from utils.logger import setup_logger
 
 
-def test_sonar_config_defaults():
-    """Sonar 配置项默认存在"""
-    from config.config import Config
+def _apply_env_overrides(env_overrides: dict[str, str], unset_keys: list[str]):
+    original_env = {}
+    for key in set(unset_keys) | set(env_overrides.keys()):
+        original_env[key] = os.environ.get(key)
+    for key in unset_keys:
+        os.environ.pop(key, None)
+    for key, value in env_overrides.items():
+        os.environ[key] = value
+    return original_env
 
+
+def _restore_env_overrides(original_env: dict[str, str | None]):
+    for key, value in original_env.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
+def _reload_config():
+    import config.config as config_module
+
+    reloaded_module = importlib.reload(config_module)
+    globals()["Config"] = reloaded_module.Config
+    return reloaded_module.Config
+
+
+def test_sonar_config_defaults():
+    """Sonar 配置项默认值正确"""
     assert hasattr(Config, "ENABLE_SONAR")
     assert hasattr(Config, "SONAR_MODEL")
     assert hasattr(Config, "SONAR_USE_TRUSTED_DOMAINS")
+
+    original_env = _apply_env_overrides(
+        {
+            "ENABLE_SONAR": "",
+            "SONAR_MODEL": "",
+            "SONAR_USE_TRUSTED_DOMAINS": "",
+        },
+        [],
+    )
+    try:
+        config_class = _reload_config()
+        assert config_class.ENABLE_SONAR is False
+        assert config_class.SONAR_MODEL == "perplexity/sonar"
+        assert config_class.SONAR_USE_TRUSTED_DOMAINS is False
+    finally:
+        _restore_env_overrides(original_env)
+        _reload_config()
+
+
+def test_sonar_config_env_override():
+    """Sonar 配置项支持环境变量覆盖"""
+    original_env = _apply_env_overrides(
+        {
+            "ENABLE_SONAR": "true",
+            "SONAR_MODEL": "perplexity/sonar-pro",
+            "SONAR_USE_TRUSTED_DOMAINS": "true",
+        },
+        [],
+    )
+    try:
+        config_class = _reload_config()
+        assert config_class.ENABLE_SONAR is True
+        assert config_class.SONAR_MODEL == "perplexity/sonar-pro"
+        assert config_class.SONAR_USE_TRUSTED_DOMAINS is True
+    finally:
+        _restore_env_overrides(original_env)
+        _reload_config()
 
 
 def test_config_values():
