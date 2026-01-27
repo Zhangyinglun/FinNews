@@ -114,43 +114,55 @@ def main():
 
     if Config.ENABLE_TAVILY:
         try:
+            start_time = time.time()
             scrapers.append(TavilyScraper())
             logger.info("  ✓ Tavily 爬虫就绪")
+            monitor.report_module("Init_Tavily", True, duration=time.time()-start_time)
         except Exception as e:
             logger.warning(f"  ✗ Tavily爬虫初始化失败: {e}")
 
     if Config.ENABLE_DDG:
         try:
+            start_time = time.time()
             scrapers.append(DuckDuckGoScraper())
             logger.info("  ✓ DuckDuckGo 爬虫就绪")
+            monitor.report_module("Init_DDG", True, duration=time.time()-start_time)
         except Exception as e:
             logger.warning(f"  ✗ DuckDuckGo爬虫初始化失败: {e}")
 
     if Config.ENABLE_SONAR:
         try:
+            start_time = time.time()
             scrapers.append(SonarScraper())
             logger.info("  ✓ Sonar 爬虫就绪")
+            monitor.report_module("Init_Sonar", True, duration=time.time()-start_time)
         except Exception as e:
             logger.warning(f"  ✗ Sonar爬虫初始化失败: {e}")
 
     if Config.ENABLE_YFINANCE:
         try:
+            start_time = time.time()
             scrapers.append(YFinanceScraper())
             logger.info("  ✓ YFinance 爬虫就绪")
+            monitor.report_module("Init_YFinance", True, duration=time.time()-start_time)
         except Exception as e:
             logger.warning(f"  ✗ YFinance爬虫初始化失败: {e}")
 
     if Config.ENABLE_RSS:
         try:
+            start_time = time.time()
             scrapers.append(RSSFeedScraper())
             logger.info("  ✓ RSS 爬虫就绪")
+            monitor.report_module("Init_RSS", True, duration=time.time()-start_time)
         except Exception as e:
             logger.warning(f"  ✗ RSS爬虫初始化失败: {e}")
 
     if Config.ENABLE_FRED:
         try:
+            start_time = time.time()
             scrapers.append(FREDScraper())
             logger.info("  ✓ FRED 爬虫就绪")
+            monitor.report_module("Init_FRED", True, duration=time.time()-start_time)
         except Exception as e:
             logger.warning(f"  ✗ FRED爬虫初始化失败: {e}")
 
@@ -229,7 +241,9 @@ def main():
         stooq.tickers = {
             k: v for k, v in Config.STOOQ_TICKERS.items() if k in missing_tickers
         }
+        start_time = time.time()
         stooq_data = stooq.run()
+        monitor.report_module("Stooq_Fallback", True, count=len(stooq_data), duration=time.time()-start_time)
 
         if stooq_data:
             all_data.extend(stooq_data)
@@ -245,7 +259,9 @@ def main():
 
     if missing_tickers:
         logger.warning(f"  ⚠️ 仍缺失价格数据: {missing_tickers}，尝试本地缓存回退...")
+        start_time = time.time()
         fallback_data = cache_manager.get_fallback_records(missing_tickers)
+        monitor.report_module("Cache_Fallback", True, count=len(fallback_data or []), duration=time.time()-start_time)
         if fallback_data:
             all_data.extend(fallback_data)
             logger.info(f"  ✓ 已从缓存恢复 {len(fallback_data)} 条价格记录")
@@ -303,7 +319,9 @@ def main():
     price_data = [r for r in enriched_data if r.get("type") == "price_data"]
 
     rule_engine = RuleEngine()
+    start_time = time.time()
     market_signal = rule_engine.analyze(price_data)
+    monitor.report_module("RuleEngine", True, duration=time.time()-start_time)
 
     # 输出规则引擎结果
     logger.info(f"  → VIX: {market_signal.vix_value or 'N/A'}")
@@ -354,7 +372,9 @@ def main():
     logger.info("📊 组织多窗口数据...")
 
     market_analyzer = MarketAnalyzer()
+    start_time = time.time()
     multi_window_data = market_analyzer.organize_data(enriched_data, market_signal)
+    monitor.report_module("MarketAnalyzer", True, duration=time.time()-start_time)
 
     logger.info(
         f"  → Flash新闻: {len(multi_window_data.flash.news)} 条 "
