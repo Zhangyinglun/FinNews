@@ -25,3 +25,5 @@ __all__ = [
     "DuckDuckGoScraper",
     "SonarScraper",
 ]
+
+__all__.append("SonarScraper")
