@@ -172,6 +172,17 @@ class Config:
     }
 
     # ========================================
+    # Stooq Tickers (兜底数据源)
+    # ========================================
+    STOOQ_TICKERS = {
+        "vix": "^VIX",  # VIX恐慌指数
+        "dollar_index": "DX.F",  # 美元指数 (Stooq格式)
+        "treasury_10y": "10USY.B",  # 10年期国债收益率 (Stooq格式)
+        "gold_futures": "GC.F",  # 黄金期货
+        "silver_futures": "SI.F",  # 白银期货
+    }
+
+    # ========================================
     # 规则引擎阈值配置
     # ========================================
     VIX_ALERT_THRESHOLD = _getenv_float("VIX_ALERT_THRESHOLD", "20")  # VIX绝对值警戒线
