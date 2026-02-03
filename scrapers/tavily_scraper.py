@@ -39,6 +39,9 @@ class TavilyScraper(BaseScraper):
         self.client = TavilyClient(api_key=Config.TAVILY_API_KEY)
         self.trusted_domains = Config.TRUSTED_DOMAINS
 
+        self.quota_exceeded = False
+        self.error_messages: List[str] = []
+
         # 各时间窗口的查询关键词
         self.flash_queries = Config.TAVILY_FLASH_QUERIES
         self.cycle_queries = Config.TAVILY_CYCLE_QUERIES
@@ -137,6 +140,10 @@ class TavilyScraper(BaseScraper):
                 time.sleep(0.5)
 
             except Exception as e:
+                message = str(e)
+                self.error_messages.append(message)
+                if "usage limit" in message.lower():
+                    self.quota_exceeded = True
                 self.logger.warning(f"[{window_type}] 查询失败 '{query[:30]}...': {e}")
                 continue
 

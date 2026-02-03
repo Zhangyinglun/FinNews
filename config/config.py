@@ -116,6 +116,7 @@ class Config:
     RAW_DIR = OUTPUT_DIR / "raw"
     PROCESSED_DIR = OUTPUT_DIR / "processed"
     LOG_DIR = OUTPUT_DIR / "logs"
+    STORAGE_DIR = OUTPUT_DIR / "storage"
 
     # ========================================
     # API密钥
@@ -129,6 +130,9 @@ class Config:
     # ========================================
     ENABLE_TAVILY = _getenv_bool("ENABLE_TAVILY", "true")
     ENABLE_DDG = _getenv_bool("ENABLE_DDG", "true")
+    DDG_REGION = _getenv_str("DDG_REGION", "us-en")
+    DDG_BACKEND = _getenv_str("DDG_BACKEND", "auto")
+    DDG_MAX_RESULTS = _getenv_int("DDG_MAX_RESULTS", "5")
     ENABLE_YFINANCE = _getenv_bool("ENABLE_YFINANCE", "true")
     ENABLE_RSS = _getenv_bool("ENABLE_RSS", "true")
     ENABLE_FRED = _getenv_bool("ENABLE_FRED", "true")

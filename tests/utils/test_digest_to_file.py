@@ -84,26 +84,21 @@ def test_digest_to_file():
         x_title=Config.OPENROUTER_X_TITLE,
     )
 
-    # 4段式系统提示
+    # 4段式系统提示 (仅返回结构化JSON数据，不生成HTML)
     system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
-请根据提供的多窗口数据，生成一份结构化的HTML邮件摘要。
+请根据提供的多窗口数据，返回结构化的JSON数据。
 
-邮件必须包含以下4个板块:
-1. 市场指数与数据 - 顶部显示VIX信号灯(圆圈样式🟢/⚠️/🔴)，然后是价格表和经济指标
-2. 重点新闻 - 5-8条最重要的新闻，仅陈述事实，不要添加任何分析内容
-3. 其他新闻 - 剩余新闻，仅陈述事实，不要添加任何分析内容
-4. 市场分析 - 所有分析内容集中在此板块，包含情绪判断、走势预判、风险点和操作建议
+你的任务:
+1. 生成邮件标题 (subject)
+2. 从新闻中筛选5-8条最重要的作为重点新闻 (key_news)
+3. 将其他相关新闻放入其他新闻 (other_news)
+4. 撰写市场分析 (analysis)
 
 重要规则:
-- VIX信号灯必须在"市场指数与数据"板块顶部，使用圆圈样式显示状态
-- 新闻板块(第2、3部分)只陈述事实，绝对不要包含任何分析性语言
-- 所有分析、判断、建议必须集中在"市场分析"板块
-
-输出要求:
-- 所有内容必须使用中文
-- HTML格式，适合Gmail邮件客户端
-- 使用专业但易懂的语言
-- 数据引用要准确
+- 所有英文新闻标题和摘要必须翻译成中文
+- 新闻只陈述事实，不要添加任何分析性语言
+- 所有分析、判断、建议必须放在analysis字段
+- 使用中文，专业但易懂
 - 严格按照JSON Schema返回结果"""
 
     resp = client.chat_completions(
@@ -124,8 +119,14 @@ def test_digest_to_file():
 
     digest = json.loads(content)
 
-    subject = digest.get("subject", "FinNews Digest")
-    html_body = digest.get("html_body", "<p>No content</p>")
+    subject = digest.get("subject") or controller.get_email_subject(market_signal)
+    email_html, _ = controller.render_email_html(
+        digest_data=digest,
+        signal=market_signal,
+        data=multi_window_data,
+    )
+    if not email_html:
+        raise SystemExit("未生成有效的HTML邮件内容")
 
     # 保存为 HTML 文件
     output_file = (
@@ -133,62 +134,12 @@ def test_digest_to_file():
         / f"digest_preview_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
     )
 
-    # 包装完整的 HTML 文档
-    full_html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{subject}</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }}
-        .email-container {{
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        h1 {{
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
-        }}
-        h2 {{
-            color: #34495e;
-            margin-top: 30px;
-        }}
-        .metadata {{
-            color: #7f8c8d;
-            font-size: 0.9em;
-            margin-bottom: 20px;
-        }}
-    </style>
-</head>
-<body>
-    <div class="email-container">
-        <h1>{subject}</h1>
-        <div class="metadata">
-            Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}<br>
-            Flash: {stats["flash_news_count"]} | Cycle: {stats["cycle_news_count"]} | Trend: {stats["trend_news_count"]}
-        </div>
-        {html_body}
-    </div>
-</body>
-</html>"""
-
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write(full_html)
+        f.write(email_html)
 
     print(f"\n✅ Digest saved to: {output_file}")
     print(f"Subject: {subject}")
-    print(f"HTML body size: {len(html_body)} chars")
+    print(f"HTML长度: {len(email_html)} 字符")
     print(f"\nOpen in browser: file:///{output_file.absolute()}")
 
 

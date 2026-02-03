@@ -1,18 +1,25 @@
 """
 DuckDuckGo Scraper - 免费新闻搜索替代方案
-使用 duckduckgo_search 库
+使用 ddgs 库
 """
 
 import time
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional, Type
 from datetime import datetime
 
+DDGSClass: Optional[Type[Any]] = None
+
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS as DDGSClass
 
     DDG_AVAILABLE = True
 except ImportError:
-    DDG_AVAILABLE = False
+    try:
+        from duckduckgo_search import DDGS as DDGSClass
+
+        DDG_AVAILABLE = True
+    except ImportError:
+        DDG_AVAILABLE = False
 
 from .base_scraper import BaseScraper
 from config.config import Config
@@ -27,7 +34,7 @@ class DuckDuckGoScraper(BaseScraper):
         super().__init__("DuckDuckGo")
 
         if not DDG_AVAILABLE:
-            raise ImportError("duckduckgo_search未安装")
+            raise ImportError("ddgs未安装")
 
         self.flash_queries = Config.TAVILY_FLASH_QUERIES
         self.cycle_queries = Config.TAVILY_CYCLE_QUERIES
@@ -58,7 +65,12 @@ class DuckDuckGoScraper(BaseScraper):
     ) -> List[Dict[str, Any]]:
         """执行单个窗口查询"""
         results: List[Dict[str, Any]] = []
-        ddgs = DDGS()
+        if not DDG_AVAILABLE or DDGSClass is None:
+            raise ImportError("ddgs未安装")
+        ddgs = DDGSClass()
+        region = Config.DDG_REGION
+        backend = Config.DDG_BACKEND
+        max_results = Config.DDG_MAX_RESULTS
 
         for query in queries:
             try:
@@ -66,20 +78,36 @@ class DuckDuckGoScraper(BaseScraper):
 
                 # 使用 news() 方法获取新闻
                 # timelimit: d (day), w (week), m (month)
-                search_results = ddgs.news(
-                    keywords=query,
-                    region="wt-wt",
-                    safesearch="off",
+                search_results = self._search_news(
+                    ddgs=ddgs,
+                    query=query,
+                    region=region,
                     timelimit=timelimit,
-                    max_results=5,
+                    max_results=max_results,
+                    backend=backend,
                 )
 
+                if not search_results:
+                    search_results = self._search_text(
+                        ddgs=ddgs,
+                        query=query,
+                        region=region,
+                        timelimit=timelimit,
+                        max_results=max_results,
+                        backend=backend,
+                    )
+
                 for res in search_results:
+                    date_value: Optional[str] = None
+                    raw_date = res.get("date")
+                    if isinstance(raw_date, str):
+                        date_value = raw_date
+
                     record = self._create_base_record(
                         title=res.get("title", ""),
                         summary=res.get("body", ""),
-                        url=res.get("url", ""),
-                        timestamp=self._parse_date(res.get("date")),
+                        url=self._get_result_url(res),
+                        timestamp=self._parse_date(date_value),
                         record_type="news",
                     )
                     record["window_type"] = window_type
@@ -97,7 +125,15 @@ class DuckDuckGoScraper(BaseScraper):
 
         return results
 
-    def _parse_date(self, date_str: str) -> datetime:
+    @staticmethod
+    def _get_result_url(result: Dict[str, Any]) -> str:
+        for key in ("url", "href", "link"):
+            value = result.get(key)
+            if isinstance(value, str):
+                return value
+        return ""
+
+    def _parse_date(self, date_str: Optional[str]) -> datetime:
         """解析DDG日期"""
         if not date_str:
             return datetime.now()
@@ -106,3 +142,78 @@ class DuckDuckGoScraper(BaseScraper):
             return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
         except Exception:
             return datetime.now()
+
+    def _search_news(
+        self,
+        *,
+        ddgs: Any,
+        query: str,
+        region: str,
+        timelimit: str,
+        max_results: int,
+        backend: str,
+    ) -> List[Dict[str, Any]]:
+        return self._call_ddgs(
+            func=ddgs.news,
+            query=query,
+            region=region,
+            timelimit=timelimit,
+            max_results=max_results,
+            backend=backend,
+        )
+
+    def _search_text(
+        self,
+        *,
+        ddgs: Any,
+        query: str,
+        region: str,
+        timelimit: str,
+        max_results: int,
+        backend: str,
+    ) -> List[Dict[str, Any]]:
+        return self._call_ddgs(
+            func=ddgs.text,
+            query=query,
+            region=region,
+            timelimit=timelimit,
+            max_results=max_results,
+            backend=backend,
+        )
+
+    @staticmethod
+    def _call_ddgs(
+        *,
+        func: Any,
+        query: str,
+        region: str,
+        timelimit: str,
+        max_results: int,
+        backend: str,
+    ) -> List[Dict[str, Any]]:
+        common_args = {
+            "region": region,
+            "safesearch": "off",
+            "timelimit": timelimit,
+            "max_results": max_results,
+        }
+        attempts = [
+            {"query": query, "backend": backend},
+            {"query": query},
+            {"keywords": query, "backend": backend},
+            {"keywords": query},
+        ]
+        last_exc: Optional[TypeError] = None
+        for attempt in attempts:
+            try:
+                result = func(**common_args, **attempt)
+                return result or []
+            except TypeError as exc:
+                message = str(exc)
+                if "query" in message or "backend" in message:
+                    last_exc = exc
+                    continue
+                raise
+        if last_exc is not None:
+            raise last_exc
+        return []

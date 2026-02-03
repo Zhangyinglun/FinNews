@@ -367,6 +367,16 @@ FRED_SERIES_IDS = [
 ]
 ```
 
+#### DuckDuckGo (ddgs) 配置
+
+DuckDuckGo 使用 `ddgs` 包进行新闻抓取，当 `news()` 无结果时会回退到 `text()` 搜索。
+
+```env
+DDG_REGION=us-en
+DDG_BACKEND=auto
+DDG_MAX_RESULTS=5
+```
+
 #### 关键词过滤器
 
 **白名单**（必须包含至少一个）：

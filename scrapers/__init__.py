@@ -11,6 +11,7 @@ from .alpha_vantage_scraper import AlphaVantageScraper
 from .etf_scraper import EtfScraper
 from .comex_scraper import ComexScraper
 from .ddg_scraper import DuckDuckGoScraper
+from .stooq_scraper import StooqScraper
 from .sonar_scraper import SonarScraper
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "EtfScraper",
     "ComexScraper",
     "DuckDuckGoScraper",
+    "StooqScraper",
     "SonarScraper",
 ]

@@ -145,19 +145,21 @@ def test_openrouter_digest():
         x_title=Config.OPENROUTER_X_TITLE,
     )
 
-    # 4段式系统提示
+    # 4段式系统提示 (仅返回结构化JSON数据，不生成HTML)
     system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
-请根据提供的多窗口数据，生成一份结构化的HTML邮件摘要。
+请根据提供的多窗口数据，返回结构化的JSON数据。
 
-邮件必须包含以下4个板块:
-1. 市场指数与数据 - 顶部显示VIX信号灯(圆圈样式🟢/⚠️/🔴)，然后是价格表和经济指标
-2. 重点新闻 - 5-8条最重要的新闻，仅陈述事实，不要添加任何分析内容
-3. 其他新闻 - 剩余新闻，仅陈述事实，不要添加任何分析内容
-4. 市场分析 - 所有分析内容集中在此板块
+你的任务:
+1. 生成邮件标题 (subject)
+2. 从新闻中筛选5-8条最重要的作为重点新闻 (key_news)
+3. 将其他相关新闻放入其他新闻 (other_news)
+4. 撰写市场分析 (analysis)
 
-输出要求:
-- 所有内容必须使用中文
-- HTML格式，适合Gmail邮件客户端
+重要规则:
+- 所有英文新闻标题和摘要必须翻译成中文
+- 新闻只陈述事实，不要添加任何分析性语言
+- 所有分析、判断、建议必须放在analysis字段
+- 使用中文，专业但易懂
 - 严格按照JSON Schema返回结果"""
 
     print("\nCalling OpenRouter API...")
@@ -177,11 +179,35 @@ def test_openrouter_digest():
     data = json.loads(content)
 
     assert isinstance(data.get("subject"), str) and data["subject"].strip()
-    assert isinstance(data.get("html_body"), str) and data["html_body"].strip()
+
+    for list_name in ("key_news", "other_news"):
+        items = data.get(list_name)
+        assert isinstance(items, list)
+        for item in items:
+            assert isinstance(item.get("title"), str) and item["title"].strip()
+            assert isinstance(item.get("source"), str) and item["source"].strip()
+            assert isinstance(item.get("summary"), str)
+
+    analysis = data.get("analysis")
+    assert isinstance(analysis, dict)
+    for key in (
+        "market_sentiment",
+        "price_outlook",
+        "risk_factors",
+        "trading_suggestion",
+    ):
+        assert isinstance(analysis.get(key), str) and analysis[key].strip()
+
+    email_html, _ = controller.render_email_html(
+        digest_data=data,
+        signal=market_signal,
+        data=multi_window_data,
+    )
+    assert isinstance(email_html, str) and email_html.strip()
 
     print("\n✅ OK: schema-like response received")
     print(f"Subject: {data['subject']}")
-    print(f"HTML body length: {len(data['html_body'])} characters")
+    print(f"HTML长度: {len(email_html)} 字符")
 
 
 if __name__ == "__main__":

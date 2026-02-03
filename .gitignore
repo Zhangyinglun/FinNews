@@ -70,3 +70,14 @@ outputs/digest_preview_*.html
 *.tmp
 *.bak
 *.cache
+
+# Test outputs
+tests/scrapers/output_*.json
+tests/processors/output_*.json
+tests/storage/test_results.json
+
+# OpenCode IDE
+.opencode/
+
+# Diagnostic scripts
+diagnose_*.py

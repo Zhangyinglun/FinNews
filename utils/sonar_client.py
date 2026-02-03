@@ -198,7 +198,8 @@ class SonarClient:
             answer = message.get("content", "")
 
             # 提取 citations (Perplexity 特有字段)
-            raw_citations = message.get("citations", [])
+            # 注意：在 OpenRouter 的 Perplexity 响应中，citations 往往在顶层或 message 中
+            raw_citations = message.get("citations") or response.get("citations") or []
 
             # 解析 citations
             citations: List[Citation] = []
