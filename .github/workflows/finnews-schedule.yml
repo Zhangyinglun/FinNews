@@ -40,7 +40,7 @@ jobs:
 
       # Email digest (OpenRouter -> Gmail SMTP)
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'google/gemini-3-pro-preview' }}
+      OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'deepseek/deepseek-v3.2' }}
       OPENROUTER_HTTP_REFERER: ${{ secrets.OPENROUTER_HTTP_REFERER || '' }}
       OPENROUTER_X_TITLE: ${{ secrets.OPENROUTER_X_TITLE || '' }}
 
