@@ -4,7 +4,7 @@
 """
 
 import hashlib
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
 from datetime import datetime, timedelta
 import logging
 
@@ -16,7 +16,7 @@ logger = logging.getLogger("processors.deduplicator")
 class Deduplicator:
     """去重处理器"""
 
-    def __init__(self, time_window_hours: int = None):
+    def __init__(self, time_window_hours: Optional[int] = None):
         """
         初始化去重器
 

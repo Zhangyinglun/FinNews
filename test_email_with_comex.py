@@ -57,25 +57,6 @@ def create_mock_comex_signal() -> ComexSignal:
         generated_at=now,
     )
 
-    # 黄金：库存稳定，正常水平
-    gold = ComexMetric(
-        current_value=8234567.89,  # 约 823 万盎司
-        previous_value=8456789.12,  # 约 845 万盎司
-        change_percent=-2.63,  # 小幅下降
-        alert_level=ComexAlertLevel.NORMAL,
-        alert_message="黄金注册库存小幅下降 2.63%，仍处健康区间",
-        recommendation="继续观察，暂无异常",
-        timestamp=now,
-    )
-
-    return ComexSignal(
-        silver=silver,
-        gold=gold,
-        overall_alert=ComexAlertLevel.CRITICAL,  # 整体警报级别由最高级别决定
-        squeeze_risk_score=0.78,  # 挤仓风险评分 0-1
-        timestamp=now,
-    )
-
 
 def create_mock_market_signal(with_comex: bool = True) -> MarketSignal:
     """创建模拟的市场信号"""
@@ -98,12 +79,8 @@ def create_mock_market_signal(with_comex: bool = True) -> MarketSignal:
             "🔴 VIX 暴涨 22.95%，市场恐慌情绪急剧升温",
             "⚠️ VIX=22.5 超过警戒线 20.0",
         ],
-        timestamp=datetime.now(),
         is_urgent=True,
     )
-
-    if with_comex:
-        signal.comex_signal = create_mock_comex_signal()
 
     return signal
 

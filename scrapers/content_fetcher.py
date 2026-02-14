@@ -211,7 +211,7 @@ class ContentFetcher:
         # 通用策略：查找文章主体
         article_tags = soup.find_all(
             ["article", "div"],
-            class_=lambda x: x
+            class_=lambda x: bool(x)
             and any(
                 keyword in x.lower()
                 for keyword in [

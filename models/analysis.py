@@ -49,32 +49,42 @@ class MarketSignal(BaseModel):
     """
 
     # VIX 信号
-    vix_value: Optional[float] = Field(None, description="VIX当前值")
-    vix_prev_close: Optional[float] = Field(None, description="VIX前收盘价")
-    vix_change_percent: Optional[float] = Field(None, description="VIX日变化百分比")
+    vix_value: Optional[float] = Field(default=None, description="VIX当前值")
+    vix_prev_close: Optional[float] = Field(default=None, description="VIX前收盘价")
+    vix_change_percent: Optional[float] = Field(
+        default=None, description="VIX日变化百分比"
+    )
     vix_alert_level: AlertLevel = Field(
         default=AlertLevel.NORMAL, description="VIX警报级别"
     )
 
     # DXY 信号
-    dxy_value: Optional[float] = Field(None, description="美元指数当前值")
-    dxy_change_percent: Optional[float] = Field(None, description="DXY日变化百分比")
+    dxy_value: Optional[float] = Field(default=None, description="美元指数当前值")
+    dxy_change_percent: Optional[float] = Field(
+        default=None, description="DXY日变化百分比"
+    )
 
     # US10Y 信号
-    us10y_value: Optional[float] = Field(None, description="10年期国债收益率")
-    us10y_change_percent: Optional[float] = Field(None, description="US10Y日变化百分比")
+    us10y_value: Optional[float] = Field(default=None, description="10年期国债收益率")
+    us10y_change_percent: Optional[float] = Field(
+        default=None, description="US10Y日变化百分比"
+    )
 
     # 贵金属
-    gold_price: Optional[float] = Field(None, description="黄金价格")
-    gold_change_percent: Optional[float] = Field(None, description="黄金日变化百分比")
-    silver_price: Optional[float] = Field(None, description="白银价格")
-    silver_change_percent: Optional[float] = Field(None, description="白银日变化百分比")
+    gold_price: Optional[float] = Field(default=None, description="黄金价格")
+    gold_change_percent: Optional[float] = Field(
+        default=None, description="黄金日变化百分比"
+    )
+    silver_price: Optional[float] = Field(default=None, description="白银价格")
+    silver_change_percent: Optional[float] = Field(
+        default=None, description="白银日变化百分比"
+    )
 
     # 综合判断
     macro_bias: MacroBias = Field(default=MacroBias.NEUTRAL, description="宏观倾向判断")
     sentiment_score: float = Field(default=0.0, description="情感评分 (-1.0到1.0)")
     price_source_note: Optional[str] = Field(
-        None, description="价格数据来源备注 (如: 含缓存数据)"
+        default=None, description="价格数据来源备注 (如: 含缓存数据)"
     )
 
     # 警报信息
@@ -149,7 +159,7 @@ class AnalysisResult(BaseModel):
 
     # 状态
     success: bool = Field(default=False, description="分析是否成功")
-    error_message: Optional[str] = Field(None, description="错误信息")
+    error_message: Optional[str] = Field(default=None, description="错误信息")
 
     # 时间戳
     generated_at: datetime = Field(
@@ -165,48 +175,54 @@ class ComexSignal(BaseModel):
 
     # 白银库存数据
     silver_registered: Optional[float] = Field(
-        None, description="白银Registered库存(盎司)"
+        default=None, description="白银Registered库存(盎司)"
     )
     silver_registered_million: Optional[float] = Field(
-        None, description="白银Registered库存(百万盎司)"
+        default=None, description="白银Registered库存(百万盎司)"
     )
-    silver_total: Optional[float] = Field(None, description="白银总库存(盎司)")
+    silver_total: Optional[float] = Field(default=None, description="白银总库存(盎司)")
     silver_alert_level: ComexAlertLevel = Field(
         default=ComexAlertLevel.SAFE, description="白银预警级别"
     )
     silver_alert_message: str = Field(default="", description="白银预警消息")
     silver_recommendation: str = Field(default="", description="白银投资建议")
     silver_daily_change_pct: Optional[float] = Field(
-        None, description="白银日变化百分比"
+        default=None, description="白银日变化百分比"
     )
     silver_weekly_change_pct: Optional[float] = Field(
-        None, description="白银周变化百分比"
+        default=None, description="白银周变化百分比"
     )
 
     # 黄金库存数据
     gold_registered: Optional[float] = Field(
-        None, description="黄金Registered库存(盎司)"
+        default=None, description="黄金Registered库存(盎司)"
     )
     gold_registered_million: Optional[float] = Field(
-        None, description="黄金Registered库存(百万盎司)"
+        default=None, description="黄金Registered库存(百万盎司)"
     )
-    gold_total: Optional[float] = Field(None, description="黄金总库存(盎司)")
+    gold_total: Optional[float] = Field(default=None, description="黄金总库存(盎司)")
     gold_alert_level: ComexAlertLevel = Field(
         default=ComexAlertLevel.SAFE, description="黄金预警级别"
     )
     gold_alert_message: str = Field(default="", description="黄金预警消息")
     gold_recommendation: str = Field(default="", description="黄金投资建议")
-    gold_daily_change_pct: Optional[float] = Field(None, description="黄金日变化百分比")
+    gold_daily_change_pct: Optional[float] = Field(
+        default=None, description="黄金日变化百分比"
+    )
     gold_weekly_change_pct: Optional[float] = Field(
-        None, description="黄金周变化百分比"
+        default=None, description="黄金周变化百分比"
     )
 
     # 图表 base64
-    silver_chart_base64: Optional[str] = Field(None, description="白银趋势图 base64")
-    gold_chart_base64: Optional[str] = Field(None, description="黄金趋势图 base64")
+    silver_chart_base64: Optional[str] = Field(
+        default=None, description="白银趋势图 base64"
+    )
+    gold_chart_base64: Optional[str] = Field(
+        default=None, description="黄金趋势图 base64"
+    )
 
     # 报告日期
-    report_date: Optional[datetime] = Field(None, description="CME报告日期")
+    report_date: Optional[datetime] = Field(default=None, description="CME报告日期")
 
     # 是否有紧急情况
     has_emergency: bool = Field(default=False, description="是否存在紧急警报")

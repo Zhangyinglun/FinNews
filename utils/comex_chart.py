@@ -12,7 +12,7 @@ import math
 from datetime import datetime, timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -180,7 +180,7 @@ class ComexChartGenerator:
                 left, top, right, bottom = draw.textbbox((0, 0), title, font=title_font)
                 title_w = right - left
             except AttributeError:
-                title_w, _ = draw.textsize(title, font=title_font)
+                title_w, _ = cast(Any, draw).textsize(title, font=title_font)
 
             draw.text(
                 ((self.width - title_w) / 2, 10),

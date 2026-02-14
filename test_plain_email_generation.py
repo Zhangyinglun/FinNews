@@ -53,7 +53,6 @@ def create_mock_signal():
             "🔴 VIX 暴涨 22.95%，市场恐慌情绪急剧升温",
             "⚠️ VIX=22.5 超过警戒线 20.0",
         ],
-        timestamp=datetime.now(),
         is_urgent=True,
     )
 

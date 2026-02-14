@@ -70,6 +70,7 @@ outputs/digest_preview_*.html
 *.tmp
 *.bak
 *.cache
+nul
 
 # Test outputs
 tests/scrapers/output_*.json

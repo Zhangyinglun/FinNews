@@ -8,6 +8,7 @@ import os
 import json
 import base64
 import requests
+from typing import Any, cast
 from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -71,9 +72,8 @@ def load_env_file():
 
 def encrypt_secret(public_key: str, secret_value: str) -> str:
     """使用公钥加密 secret"""
-    public_key_obj = public.PublicKey(
-        public_key.encode("utf-8"), encoding.Base64Encoder()
-    )
+    encoder = cast(Any, encoding.Base64Encoder())
+    public_key_obj = public.PublicKey(public_key.encode("utf-8"), encoder)
     encrypted = public.SealedBox(public_key_obj).encrypt(secret_value.encode("utf-8"))
     return base64.b64encode(encrypted).decode("utf-8")
 

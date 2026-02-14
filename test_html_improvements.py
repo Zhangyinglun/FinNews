@@ -229,7 +229,7 @@ def main():
     # 验证 HTML 内容
     print("✅ HTML 邮件生成成功")
     print(f"  - HTML 长度: {len(html)} 字符")
-    print(f"  - 嵌入图片数量: {len(images)}")
+    print(f"  - 嵌入图片数量: {len(images or {})}")
     print()
 
     # 检查关键元素

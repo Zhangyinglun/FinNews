@@ -14,15 +14,15 @@ class PriceData(BaseModel):
     ticker: str = Field(..., description="股票代码")
     ticker_name: str = Field(..., description="股票名称")
     price: float = Field(..., description="当前价格")
-    change: Optional[float] = Field(None, description="价格变化")
-    change_percent: Optional[float] = Field(None, description="变化百分比")
-    week_change_percent: Optional[float] = Field(None, description="周涨跌幅")
-    open: Optional[float] = Field(None, description="开盘价")
-    high: Optional[float] = Field(None, description="最高价")
-    low: Optional[float] = Field(None, description="最低价")
-    volume: Optional[int] = Field(None, description="成交量")
-    prev_close: Optional[float] = Field(None, description="前收盘价")
-    ma5: Optional[float] = Field(None, description="5日均线")
+    change: Optional[float] = Field(default=None, description="价格变化")
+    change_percent: Optional[float] = Field(default=None, description="变化百分比")
+    week_change_percent: Optional[float] = Field(default=None, description="周涨跌幅")
+    open: Optional[float] = Field(default=None, description="开盘价")
+    high: Optional[float] = Field(default=None, description="最高价")
+    low: Optional[float] = Field(default=None, description="最低价")
+    volume: Optional[int] = Field(default=None, description="成交量")
+    prev_close: Optional[float] = Field(default=None, description="前收盘价")
+    ma5: Optional[float] = Field(default=None, description="5日均线")
     timestamp: datetime = Field(default_factory=datetime.now, description="数据时间")
 
     class Config:
@@ -35,8 +35,8 @@ class EconomicData(BaseModel):
     indicator: str = Field(..., description="指标名称")
     series_id: str = Field(..., description="FRED系列ID")
     value: float = Field(..., description="指标值")
-    change: Optional[float] = Field(None, description="变化值")
-    change_pct: Optional[float] = Field(None, description="变化百分比")
+    change: Optional[float] = Field(default=None, description="变化值")
+    change_pct: Optional[float] = Field(default=None, description="变化百分比")
     timestamp: datetime = Field(..., description="数据时间")
     source: str = Field(default="FRED", description="数据来源")
 
@@ -53,12 +53,12 @@ class NewsItem(BaseModel):
     source: str = Field(..., description="新闻来源")
     timestamp: datetime = Field(default_factory=datetime.now, description="发布时间")
     impact_tag: Optional[str] = Field(
-        None, description="影响标签: #Bullish/#Bearish/#Neutral"
+        default=None, description="影响标签: #Bullish/#Bearish/#Neutral"
     )
-    relevance_score: Optional[float] = Field(None, description="相关性评分")
-    full_content: Optional[str] = Field(None, description="完整内容")
+    relevance_score: Optional[float] = Field(default=None, description="相关性评分")
+    full_content: Optional[str] = Field(default=None, description="完整内容")
     window_type: Optional[str] = Field(
-        None, description="时间窗口类型: flash/cycle/trend"
+        default=None, description="时间窗口类型: flash/cycle/trend"
     )
 
     class Config:
@@ -72,23 +72,33 @@ class FlashWindowData(BaseModel):
     """
 
     # VIX 数据
-    vix_value: Optional[float] = Field(None, description="VIX当前值")
-    vix_prev_close: Optional[float] = Field(None, description="VIX前收盘价")
-    vix_change_percent: Optional[float] = Field(None, description="VIX变化百分比")
+    vix_value: Optional[float] = Field(default=None, description="VIX当前值")
+    vix_prev_close: Optional[float] = Field(default=None, description="VIX前收盘价")
+    vix_change_percent: Optional[float] = Field(
+        default=None, description="VIX变化百分比"
+    )
 
     # DXY 数据
-    dxy_value: Optional[float] = Field(None, description="美元指数当前值")
-    dxy_change_percent: Optional[float] = Field(None, description="美元指数变化百分比")
+    dxy_value: Optional[float] = Field(default=None, description="美元指数当前值")
+    dxy_change_percent: Optional[float] = Field(
+        default=None, description="美元指数变化百分比"
+    )
 
     # US10Y 数据
-    us10y_value: Optional[float] = Field(None, description="10年期国债收益率")
-    us10y_change_percent: Optional[float] = Field(None, description="10Y变化百分比")
+    us10y_value: Optional[float] = Field(default=None, description="10年期国债收益率")
+    us10y_change_percent: Optional[float] = Field(
+        default=None, description="10Y变化百分比"
+    )
 
     # 贵金属价格
-    gold_price: Optional[float] = Field(None, description="黄金价格")
-    gold_change_percent: Optional[float] = Field(None, description="黄金变化百分比")
-    silver_price: Optional[float] = Field(None, description="白银价格")
-    silver_change_percent: Optional[float] = Field(None, description="白银变化百分比")
+    gold_price: Optional[float] = Field(default=None, description="黄金价格")
+    gold_change_percent: Optional[float] = Field(
+        default=None, description="黄金变化百分比"
+    )
+    silver_price: Optional[float] = Field(default=None, description="白银价格")
+    silver_change_percent: Optional[float] = Field(
+        default=None, description="白银变化百分比"
+    )
 
     # 即时新闻
     news: List[NewsItem] = Field(default_factory=list, description="12小时内突发新闻")
@@ -110,12 +120,12 @@ class CycleWindowData(BaseModel):
     """
 
     # 经济指标
-    cpi_actual: Optional[float] = Field(None, description="CPI实际值")
-    cpi_forecast: Optional[str] = Field(None, description="CPI预期值")
-    nfp_actual: Optional[float] = Field(None, description="非农就业实际值")
-    nfp_forecast: Optional[str] = Field(None, description="非农就业预期值")
-    pce_actual: Optional[float] = Field(None, description="PCE实际值")
-    fed_rate: Optional[float] = Field(None, description="联邦基金利率")
+    cpi_actual: Optional[float] = Field(default=None, description="CPI实际值")
+    cpi_forecast: Optional[str] = Field(default=None, description="CPI预期值")
+    nfp_actual: Optional[float] = Field(default=None, description="非农就业实际值")
+    nfp_forecast: Optional[str] = Field(default=None, description="非农就业预期值")
+    pce_actual: Optional[float] = Field(default=None, description="PCE实际值")
+    fed_rate: Optional[float] = Field(default=None, description="联邦基金利率")
 
     # 本周新闻
     news: List[NewsItem] = Field(default_factory=list, description="本周重要新闻")
@@ -137,10 +147,12 @@ class TrendWindowData(BaseModel):
     """
 
     # 央行购金
-    central_bank_buying: Optional[str] = Field(None, description="央行购金情况描述")
+    central_bank_buying: Optional[str] = Field(
+        default=None, description="央行购金情况描述"
+    )
 
     # ETF流向
-    etf_flows: Optional[str] = Field(None, description="ETF资金流向描述")
+    etf_flows: Optional[str] = Field(default=None, description="ETF资金流向描述")
 
     # 月度新闻
     news: List[NewsItem] = Field(default_factory=list, description="月度趋势新闻")
@@ -157,13 +169,13 @@ class MultiWindowData(BaseModel):
     """
 
     flash: FlashWindowData = Field(
-        default_factory=FlashWindowData, description="即时窗口数据"
+        default_factory=lambda: FlashWindowData(), description="即时窗口数据"
     )
     cycle: CycleWindowData = Field(
-        default_factory=CycleWindowData, description="周度窗口数据"
+        default_factory=lambda: CycleWindowData(), description="周度窗口数据"
     )
     trend: TrendWindowData = Field(
-        default_factory=TrendWindowData, description="月度窗口数据"
+        default_factory=lambda: TrendWindowData(), description="月度窗口数据"
     )
 
     # 所有原始记录(用于存储和LLM输入)

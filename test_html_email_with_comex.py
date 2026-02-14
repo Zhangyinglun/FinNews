@@ -171,7 +171,7 @@ try:
         comex_signal=comex_signal,
     )
     print(f"   ✓ HTML 渲染成功: {len(email_html)} 字符")
-    print(f"   ✓ 图片数量: {len(email_images)} 张")
+    print(f"   ✓ 图片数量: {len(email_images or {})} 张")
 
     # 检查图片
     if email_images:

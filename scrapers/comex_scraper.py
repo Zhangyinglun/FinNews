@@ -135,11 +135,17 @@ class ComexScraper(BaseScraper):
                 # 查找报告日期 (通常在前几行)
                 if "ACTIVITY DATE" in row_text or "REPORT DATE" in row_text:
                     for cell in row:
-                        if isinstance(cell, float) and cell > 40000:
+                        parsed_excel_date = None
+                        try:
+                            parsed_excel_date = float(cell)
+                        except (TypeError, ValueError):
+                            parsed_excel_date = None
+
+                        if parsed_excel_date is not None and parsed_excel_date > 40000:
                             # Excel日期格式转换
                             try:
                                 date_tuple = xlrd.xldate_as_tuple(
-                                    cell, workbook.datemode
+                                    parsed_excel_date, workbook.datemode
                                 )
                                 data["report_date"] = datetime(*date_tuple[:3])
                             except Exception:

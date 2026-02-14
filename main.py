@@ -74,6 +74,7 @@ def send_email_with_retry(
     for attempt in range(1, max_retries + 1):
         try:
             if mail_type == "plain":
+                assert plain_body is not None
                 mailer.send_plain(
                     subject=subject,
                     plain_body=plain_body,
@@ -81,6 +82,7 @@ def send_email_with_retry(
                     to_list=to_list,
                 )
             else:  # mail_type == "html"
+                assert html_body is not None
                 mailer.send_html(
                     subject=subject,
                     html_body=html_body,

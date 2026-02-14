@@ -4,7 +4,7 @@ Alpha Vantage API - 备选数据源
 注意: 免费版限制较多(25 requests/天),仅作备用
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
 from datetime import datetime
 
 try:
@@ -49,9 +49,10 @@ class AlphaVantageScraper(BaseScraper):
         try:
             # 美元指数(通过USD/EUR等货币对间接)
             self.logger.debug("获取USD/EUR汇率...")
-            data, meta = self.fx.get_currency_exchange_daily(
+            response = self.fx.get_currency_exchange_daily(
                 from_symbol="USD", to_symbol="EUR", outputsize="compact"
             )
+            data = cast(Any, response[0])
 
             if not data.empty:
                 latest = data.iloc[0]

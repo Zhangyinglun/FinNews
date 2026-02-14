@@ -6,7 +6,7 @@ JSON存储模块
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 from config.config import Config
@@ -21,7 +21,7 @@ class JSONStorage:
         self.raw_dir = Config.RAW_DIR
         self.processed_dir = Config.PROCESSED_DIR
 
-    def save_raw(self, data: List[Dict[str, Any]], filename: str = None):
+    def save_raw(self, data: List[Dict[str, Any]], filename: Optional[str] = None):
         """
         保存原始数据
 
@@ -38,7 +38,9 @@ class JSONStorage:
 
         logger.info(f"原始数据已保存: {filepath}")
 
-    def save_processed(self, data: List[Dict[str, Any]], filename: str = None):
+    def save_processed(
+        self, data: List[Dict[str, Any]], filename: Optional[str] = None
+    ):
         """
         保存处理后数据(Markdown格式)
 

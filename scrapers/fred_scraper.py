@@ -3,7 +3,7 @@ FRED API - 圣路易斯联储经济数据
 数据: CPI, PCE, NFP, GDP等宏观指标
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
 from datetime import datetime, timedelta
 
 try:
@@ -85,6 +85,12 @@ class FREDScraper(BaseScraper):
                     if prev_value != 0:
                         change_pct = (change / prev_value) * 100
 
+                latest_date_any = cast(Any, latest_date)
+                if hasattr(latest_date_any, "to_pydatetime"):
+                    timestamp = latest_date_any.to_pydatetime()
+                else:
+                    timestamp = datetime.now()
+
                 record = {
                     "source": "FRED",
                     "indicator": indicator_name,
@@ -94,7 +100,7 @@ class FREDScraper(BaseScraper):
                     "change_pct": round(float(change_pct), 2)
                     if change_pct is not None
                     else None,
-                    "timestamp": latest_date.to_pydatetime(),
+                    "timestamp": timestamp,
                     "fetched_at": datetime.now(),
                     "type": "economic_data",
                 }

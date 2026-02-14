@@ -14,6 +14,7 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from copy import deepcopy
 
 sys.path.insert(0, "D:\\Projects\\FinNews")
 
@@ -63,13 +64,19 @@ def test_digest_to_file():
     market_analyzer = MarketAnalyzer()
     multi_window_data = market_analyzer.organize_data(records, market_signal)
 
+    # 为了避免测试超时，限制发送给 LLM 的新闻数量
+    compact_data = deepcopy(multi_window_data)
+    compact_data.flash.news = compact_data.flash.news[:8]
+    compact_data.cycle.news = compact_data.cycle.news[:5]
+    compact_data.trend.news = compact_data.trend.news[:5]
+
     print(f"\nFlash news: {len(multi_window_data.flash.news)}")
     print(f"Cycle news: {len(multi_window_data.cycle.news)}")
     print(f"Trend news: {len(multi_window_data.trend.news)}")
 
     # 创建摘要控制器
     controller = DigestController()
-    user_prompt, stats = controller.build_llm_prompt(multi_window_data, market_signal)
+    user_prompt, stats = controller.build_llm_prompt(compact_data, market_signal)
 
     print(f"\nPrompt size: {len(user_prompt)} chars")
     print("Calling OpenRouter...")
@@ -78,8 +85,8 @@ def test_digest_to_file():
     client = OpenRouterClient(
         api_key=Config.OPENROUTER_API_KEY,
         model=Config.OPENROUTER_MODEL,
-        timeout=Config.OPENROUTER_TIMEOUT,
-        max_retries=Config.OPENROUTER_MAX_RETRIES,
+        timeout=min(Config.OPENROUTER_TIMEOUT, 60),
+        max_retries=1,
         http_referer=Config.OPENROUTER_HTTP_REFERER,
         x_title=Config.OPENROUTER_X_TITLE,
     )
@@ -104,10 +111,10 @@ def test_digest_to_file():
     resp = client.chat_completions(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        temperature=Config.OPENROUTER_TEMPERATURE,
-        max_tokens=Config.OPENROUTER_MAX_TOKENS,
+        temperature=0.2,
+        max_tokens=min(Config.OPENROUTER_MAX_TOKENS, 1200),
         response_format={"type": "json_schema", "json_schema": DIGEST_JSON_SCHEMA},
-        reasoning_effort="high",
+        reasoning_effort="low",
     )
 
     print("OpenRouter call completed")
@@ -123,7 +130,7 @@ def test_digest_to_file():
     email_html, _ = controller.render_email_html(
         digest_data=digest,
         signal=market_signal,
-        data=multi_window_data,
+        data=compact_data,
     )
     if not email_html:
         raise SystemExit("未生成有效的HTML邮件内容")

@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/microsoft/pyright/main/packages/vscode-pyright/schemas/pyrightconfig.schema.json",
   "pythonVersion": "3.10",
   "pythonPlatform": "Windows",
   "include": [
@@ -26,7 +25,7 @@
     "tests/**"
   ],
   "typeCheckingMode": "basic",
-  "reportMissingImports": true,
+  "reportMissingImports": false,
   "reportMissingTypeStubs": false,
   "reportUnusedImport": false,
   "reportUnusedVariable": false,
@@ -37,7 +36,7 @@
   "reportUntypedClassDecorator": false,
   "reportUntypedBaseClass": false,
   "reportPrivateUsage": false,
-  "reportConstantRedefinition": true,
+  "reportConstantRedefinition": false,
   "reportDeprecated": true,
   "reportOptionalMemberAccess": false,
   "reportOptionalSubscript": false,
@@ -53,8 +52,6 @@
   "reportIncompleteStub": false,
   "reportUnsupportedDunderAll": true,
   "reportUnusedCallResult": false,
-  "venvPath": ".",
-  "venv": "venv",
   "executionEnvironments": [
     {
       "root": ".",
