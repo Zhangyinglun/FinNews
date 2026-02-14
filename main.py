@@ -7,6 +7,7 @@ import sys
 import json
 import time
 from datetime import datetime
+from typing import Optional
 
 from utils.logger import setup_logger
 from utils.pipeline_monitor import PipelineMonitor
@@ -20,6 +21,7 @@ from scrapers import (
     ComexScraper,
     DuckDuckGoScraper,
     StooqScraper,
+    SonarScraper,
 )
 from scrapers.content_fetcher import ContentFetcher
 from processors import DataCleaner, Deduplicator
@@ -36,40 +38,58 @@ from utils.price_cache_manager import PriceCacheManager
 def send_email_with_retry(
     mailer: GmailSmtpMailer,
     subject: str,
-    html_body: str,
     email_from: str,
     to_list: list,
     max_retries: int = 3,
     logger=None,
+    html_body: Optional[str] = None,
+    plain_body: Optional[str] = None,
     images=None,
 ) -> bool:
     """
-    带重试的邮件发送
+    带重试的邮件发送（支持纯文本和HTML两种模式）
 
     Args:
         mailer: 邮件发送器实例
         subject: 邮件标题
-        html_body: HTML正文
         email_from: 发件人
         to_list: 收件人列表
         max_retries: 最大重试次数
         logger: 日志记录器
-        images: 内嵌图片字典 {id: base64_data}
+        html_body: HTML正文（可选）
+        plain_body: 纯文本正文（可选）
+        images: 内嵌图片字典 {id: base64_data}（仅用于HTML邮件）
 
     Returns:
         发送是否成功
     """
+    # 确定邮件类型
+    if plain_body and not html_body:
+        mail_type = "plain"
+    elif html_body:
+        mail_type = "html"
+    else:
+        raise ValueError("必须提供 html_body 或 plain_body 之一")
+
     for attempt in range(1, max_retries + 1):
         try:
-            mailer.send_html(
-                subject=subject,
-                html_body=html_body,
-                email_from=email_from,
-                to_list=to_list,
-                images=images,
-            )
+            if mail_type == "plain":
+                mailer.send_plain(
+                    subject=subject,
+                    plain_body=plain_body,
+                    email_from=email_from,
+                    to_list=to_list,
+                )
+            else:  # mail_type == "html"
+                mailer.send_html(
+                    subject=subject,
+                    html_body=html_body,
+                    email_from=email_from,
+                    to_list=to_list,
+                    images=images,
+                )
             if logger:
-                logger.info(f"📧 邮件发送成功: to={len(to_list)}")
+                logger.info(f"📧 {mail_type.upper()}邮件发送成功: to={len(to_list)}")
             return True
         except Exception as e:
             if logger:
@@ -99,7 +119,7 @@ def main():
         start_time = time.time()
         Config.validate()
         logger.info("✅ 配置验证通过")
-        monitor.report_module("配置验证", True, duration=time.time()-start_time)
+        monitor.report_module("配置验证", True, duration=time.time() - start_time)
     except ValueError as e:
         logger.error(f"❌ 配置错误: {e}")
         monitor.report_module("配置验证", False, error=str(e))
@@ -117,7 +137,9 @@ def main():
             start_time = time.time()
             scrapers.append(TavilyScraper())
             logger.info("  ✓ Tavily 爬虫就绪")
-            monitor.report_module("Init_Tavily", True, duration=time.time()-start_time)
+            monitor.report_module(
+                "Init_Tavily", True, duration=time.time() - start_time
+            )
         except Exception as e:
             logger.warning(f"  ✗ Tavily爬虫初始化失败: {e}")
 
@@ -126,7 +148,7 @@ def main():
             start_time = time.time()
             scrapers.append(DuckDuckGoScraper())
             logger.info("  ✓ DuckDuckGo 爬虫就绪")
-            monitor.report_module("Init_DDG", True, duration=time.time()-start_time)
+            monitor.report_module("Init_DDG", True, duration=time.time() - start_time)
         except Exception as e:
             logger.warning(f"  ✗ DuckDuckGo爬虫初始化失败: {e}")
 
@@ -135,7 +157,7 @@ def main():
             start_time = time.time()
             scrapers.append(SonarScraper())
             logger.info("  ✓ Sonar 爬虫就绪")
-            monitor.report_module("Init_Sonar", True, duration=time.time()-start_time)
+            monitor.report_module("Init_Sonar", True, duration=time.time() - start_time)
         except Exception as e:
             logger.warning(f"  ✗ Sonar爬虫初始化失败: {e}")
 
@@ -144,7 +166,9 @@ def main():
             start_time = time.time()
             scrapers.append(YFinanceScraper())
             logger.info("  ✓ YFinance 爬虫就绪")
-            monitor.report_module("Init_YFinance", True, duration=time.time()-start_time)
+            monitor.report_module(
+                "Init_YFinance", True, duration=time.time() - start_time
+            )
         except Exception as e:
             logger.warning(f"  ✗ YFinance爬虫初始化失败: {e}")
 
@@ -153,7 +177,7 @@ def main():
             start_time = time.time()
             scrapers.append(RSSFeedScraper())
             logger.info("  ✓ RSS 爬虫就绪")
-            monitor.report_module("Init_RSS", True, duration=time.time()-start_time)
+            monitor.report_module("Init_RSS", True, duration=time.time() - start_time)
         except Exception as e:
             logger.warning(f"  ✗ RSS爬虫初始化失败: {e}")
 
@@ -162,7 +186,7 @@ def main():
             start_time = time.time()
             scrapers.append(FREDScraper())
             logger.info("  ✓ FRED 爬虫就绪")
-            monitor.report_module("Init_FRED", True, duration=time.time()-start_time)
+            monitor.report_module("Init_FRED", True, duration=time.time() - start_time)
         except Exception as e:
             logger.warning(f"  ✗ FRED爬虫初始化失败: {e}")
 
@@ -209,10 +233,14 @@ def main():
             data = scraper.run()
             all_data.extend(data)
             logger.info(f"  → {scraper.name}: {len(data)} 条记录")
-            monitor.report_module(scraper.name, True, count=len(data), duration=time.time()-start_time)
+            monitor.report_module(
+                scraper.name, True, count=len(data), duration=time.time() - start_time
+            )
         except Exception as e:
             logger.error(f"  → {scraper.name} 采集失败: {e}")
-            monitor.report_module(scraper.name, False, error=str(e), duration=time.time()-start_time)
+            monitor.report_module(
+                scraper.name, False, error=str(e), duration=time.time() - start_time
+            )
 
     logger.info(f"✅ 数据采集完成 - 总计 {len(all_data)} 条原始记录")
 
@@ -243,7 +271,12 @@ def main():
         }
         start_time = time.time()
         stooq_data = stooq.run()
-        monitor.report_module("Stooq_Fallback", True, count=len(stooq_data), duration=time.time()-start_time)
+        monitor.report_module(
+            "Stooq_Fallback",
+            True,
+            count=len(stooq_data),
+            duration=time.time() - start_time,
+        )
 
         if stooq_data:
             all_data.extend(stooq_data)
@@ -261,7 +294,12 @@ def main():
         logger.warning(f"  ⚠️ 仍缺失价格数据: {missing_tickers}，尝试本地缓存回退...")
         start_time = time.time()
         fallback_data = cache_manager.get_fallback_records(missing_tickers)
-        monitor.report_module("Cache_Fallback", True, count=len(fallback_data or []), duration=time.time()-start_time)
+        monitor.report_module(
+            "Cache_Fallback",
+            True,
+            count=len(fallback_data or []),
+            duration=time.time() - start_time,
+        )
         if fallback_data:
             all_data.extend(fallback_data)
             logger.info(f"  ✓ 已从缓存恢复 {len(fallback_data)} 条价格记录")
@@ -290,12 +328,16 @@ def main():
 
     start_time = time.time()
     cleaned_data = cleaner.clean(all_data)
-    monitor.report_module("DataCleaner", True, count=len(cleaned_data), duration=time.time()-start_time)
+    monitor.report_module(
+        "DataCleaner", True, count=len(cleaned_data), duration=time.time() - start_time
+    )
     logger.info(f"  → 清洗后: {len(cleaned_data)} 条")
 
     start_time = time.time()
     unique_data = deduplicator.deduplicate(cleaned_data)
-    monitor.report_module("Deduplicator", True, count=len(unique_data), duration=time.time()-start_time)
+    monitor.report_module(
+        "Deduplicator", True, count=len(unique_data), duration=time.time() - start_time
+    )
     logger.info(f"  → 去重后: {len(unique_data)} 条")
 
     # 抓取完整新闻内容
@@ -303,7 +345,12 @@ def main():
     logger.info(f"🔍 抓取 {len(unique_data)} 条新闻的完整内容...")
     start_time = time.time()
     enriched_data = content_fetcher.enrich_articles(unique_data)
-    monitor.report_module("ContentFetcher", True, count=len(enriched_data), duration=time.time()-start_time)
+    monitor.report_module(
+        "ContentFetcher",
+        True,
+        count=len(enriched_data),
+        duration=time.time() - start_time,
+    )
 
     # 存储原始数据和处理后数据
     storage = JSONStorage()
@@ -323,7 +370,7 @@ def main():
     rule_engine = RuleEngine()
     start_time = time.time()
     market_signal = rule_engine.analyze(price_data)
-    monitor.report_module("RuleEngine", True, duration=time.time()-start_time)
+    monitor.report_module("RuleEngine", True, duration=time.time() - start_time)
 
     # 输出规则引擎结果
     logger.info(f"  → VIX: {market_signal.vix_value or 'N/A'}")
@@ -376,7 +423,7 @@ def main():
     market_analyzer = MarketAnalyzer()
     start_time = time.time()
     multi_window_data = market_analyzer.organize_data(enriched_data, market_signal)
-    monitor.report_module("MarketAnalyzer", True, duration=time.time()-start_time)
+    monitor.report_module("MarketAnalyzer", True, duration=time.time() - start_time)
 
     logger.info(
         f"  → Flash新闻: {len(multi_window_data.flash.news)} 条 "
@@ -389,97 +436,160 @@ def main():
     # 7. 构建LLM输入并生成邮件
     # ========================================
     logger.info("=" * 50)
-    logger.info("🤖 调用LLM生成邮件内容...")
 
-    digest_controller = DigestController()
-    user_prompt, stats = digest_controller.build_llm_prompt(
-        multi_window_data, market_signal
-    )
+    # 根据配置选择邮件内容类型
+    email_content_type = Config.EMAIL_CONTENT_TYPE
+    logger.info(f"📧 邮件内容类型: {email_content_type}")
 
-    # 初始化OpenRouter客户端
-    # Config.validate() 已确保 OPENROUTER_API_KEY 存在
-    assert Config.OPENROUTER_API_KEY is not None
-    client = OpenRouterClient(
-        api_key=Config.OPENROUTER_API_KEY,
-        model=Config.OPENROUTER_MODEL,
-        timeout=Config.OPENROUTER_TIMEOUT,
-        max_retries=Config.OPENROUTER_MAX_RETRIES,
-        http_referer=Config.OPENROUTER_HTTP_REFERER,
-        x_title=Config.OPENROUTER_X_TITLE,
-    )
+    if email_content_type == "plain_text":
+        # 使用纯文本格式（build_email_prompt）
+        logger.info("📝 使用纯文本邮件格式（包含 COMEX ASCII 表格）...")
 
-    # LLM系统提示 - 只返回结构化数据，不生成HTML
-    system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
+        try:
+            start_time = time.time()
+
+            # 生成纯文本邮件内容
+            email_plain = market_analyzer.build_email_prompt(
+                data=multi_window_data,
+                signal=market_signal,
+                comex_signal=comex_signal,
+                mode=Config.EMAIL_FORMAT_MODE,
+            )
+
+            # 生成邮件标题
+            tag = market_signal.get_email_subject_tag()
+            summary = market_signal.get_signal_summary()
+            date_str = datetime.now().strftime("%m/%d")
+            email_subject = f"{tag} {date_str} {summary}"
+
+            logger.info(f"✅ 纯文本邮件生成完成: {len(email_plain)} 字符")
+            logger.info(f"   标题: {email_subject}")
+
+            # 纯文本邮件不使用图片
+            email_html = None
+            email_images = None
+
+            monitor.report_module(
+                "EmailGenerator", True, duration=time.time() - start_time
+            )
+
+        except Exception as e:
+            logger.error(f"纯文本邮件生成失败: {e}", exc_info=True)
+            monitor.report_module(
+                "EmailGenerator", False, error=str(e), duration=time.time() - start_time
+            )
+
+            # 备用方案
+            email_subject = (
+                f"【系统错误】FinNews {datetime.now().strftime('%m/%d')} 生成失败"
+            )
+            email_plain = f"""FinNews 系统错误
+
+邮件生成失败: {str(e)}
+时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+规则引擎信号:
+- VIX: {market_signal.vix_value or "N/A"}
+- 警报级别: {market_signal.vix_alert_level.value}
+- 宏观倾向: {market_signal.macro_bias.value}
+"""
+            email_html = None
+            email_images = None
+
+    else:
+        # 使用 HTML 格式（原有的 LLM + 模板方式）
+        logger.info("🤖 调用LLM生成邮件内容...")
+
+        digest_controller = DigestController()
+        user_prompt, stats = digest_controller.build_llm_prompt(
+            multi_window_data, market_signal
+        )
+
+        # 初始化OpenRouter客户端
+        # Config.validate() 已确保 OPENROUTER_API_KEY 存在
+        assert Config.OPENROUTER_API_KEY is not None
+        client = OpenRouterClient(
+            api_key=Config.OPENROUTER_API_KEY,
+            model=Config.OPENROUTER_MODEL,
+            timeout=Config.OPENROUTER_TIMEOUT,
+            max_retries=Config.OPENROUTER_MAX_RETRIES,
+            http_referer=Config.OPENROUTER_HTTP_REFERER,
+            x_title=Config.OPENROUTER_X_TITLE,
+        )
+
+        # LLM系统提示 - 只返回结构化数据，不生成HTML
+        system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
 请根据提供的数据，返回结构化的JSON数据。
 
 你的任务:
 1. 生成邮件标题 (subject)
-2. 从新闻中筛选5-8条最重要的作为重点新闻 (key_news)
-3. 将其他相关新闻放入其他新闻 (other_news)  
-4. 撰写市场分析 (analysis)
+2. 从新闻中筛选恰好5条最重要的作为重点新闻 (key_news) - 注意是恰好5条，不多不少
+3. 筛选最多5条其他值得关注的新闻 (other_news)，低相关性的直接丢弃
+4. 撰写精简的市场分析 (analysis) — 每项30-60字，用要点式
 
 重要规则:
 - 所有英文新闻标题和摘要必须翻译成中文
 - 新闻只陈述事实，不要添加任何分析性语言
 - 所有分析、判断、建议必须放在analysis字段
+- 每条新闻必须包含6个字段: title, source, summary, url, impact_tag, timestamp
+- url和timestamp若原始数据中无，则填空字符串
 - 使用中文，专业但易懂
 - 严格按照JSON Schema返回结果"""
 
-    try:
-        start_time = time.time()
-        resp = client.chat_completions(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=Config.OPENROUTER_TEMPERATURE,
-            max_tokens=Config.OPENROUTER_MAX_TOKENS,
-            response_format={
-                "type": "json_schema",
-                "json_schema": DIGEST_JSON_SCHEMA,
-            },
-            reasoning_effort="high",
-        )
-
-        # 解析LLM响应
-        content = (
-            resp.get("choices", [{}])[0].get("message", {}).get("content")
-            if isinstance(resp, dict)
-            else None
-        )
-
-        digest_data = None
-        if isinstance(content, str):
-            try:
-                digest_data = json.loads(content)
-                logger.debug(
-                    f"LLM返回数据: subject={digest_data.get('subject', 'N/A')[:50]}, "
-                    f"key_news={len(digest_data.get('key_news', []))}, "
-                    f"other_news={len(digest_data.get('other_news', []))}"
-                )
-            except json.JSONDecodeError as e:
-                logger.error(f"LLM响应JSON解析失败: {e}")
-
-        # 使用模板渲染HTML
-        email_images = None
-        if isinstance(digest_data, dict):
-            email_subject = digest_data.get("subject", "")
-            email_html, email_images = digest_controller.render_email_html(
-                digest_data=digest_data,
-                signal=market_signal,
-                data=multi_window_data,
-                comex_signal=comex_signal,
+        try:
+            start_time = time.time()
+            resp = client.chat_completions(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                temperature=Config.OPENROUTER_TEMPERATURE,
+                max_tokens=Config.OPENROUTER_MAX_TOKENS,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": DIGEST_JSON_SCHEMA,
+                },
+                reasoning_effort="high",
             )
-        else:
-            email_subject = ""
-            email_html = ""
-            email_images = None
 
-        # 备用方案
-        if not email_subject:
-            email_subject = digest_controller.get_email_subject(market_signal)
+            # 解析LLM响应
+            content = (
+                resp.get("choices", [{}])[0].get("message", {}).get("content")
+                if isinstance(resp, dict)
+                else None
+            )
 
-        if not email_html:
-            logger.warning("LLM数据解析失败，使用备用邮件内容")
-            email_html = f"""<!DOCTYPE html>
+            digest_data = None
+            if isinstance(content, str):
+                try:
+                    digest_data = json.loads(content)
+                    logger.debug(
+                        f"LLM返回数据: subject={digest_data.get('subject', 'N/A')[:50]}, "
+                        f"key_news={len(digest_data.get('key_news', []))}, "
+                        f"other_news={len(digest_data.get('other_news', []))}"
+                    )
+                except json.JSONDecodeError as e:
+                    logger.error(f"LLM响应JSON解析失败: {e}")
+
+            # 使用模板渲染HTML
+            if isinstance(digest_data, dict):
+                email_subject = digest_data.get("subject", "")
+                email_html, email_images = digest_controller.render_email_html(
+                    digest_data=digest_data,
+                    signal=market_signal,
+                    data=multi_window_data,
+                    comex_signal=comex_signal,
+                )
+            else:
+                email_subject = ""
+                email_html = ""
+                email_images = None
+
+            # 备用方案
+            if not email_subject:
+                email_subject = digest_controller.get_email_subject(market_signal)
+
+            if not email_html:
+                logger.warning("LLM数据解析失败，使用备用邮件内容")
+                email_html = f"""<!DOCTYPE html>
 <html><body style="font-family: Arial, sans-serif; padding: 20px;">
 <h1>FinNews 邮件生成失败</h1>
 <p>LLM未能生成有效的数据。</p>
@@ -491,28 +601,35 @@ def main():
     <li>宏观倾向: {market_signal.macro_bias.value}</li>
 </ul>
 </body></html>"""
-            email_images = None  # 备用模式无图片
+                email_images = None  # 备用模式无图片
 
-        logger.info(f"✅ 邮件生成完成: {email_subject[:50]}...")
-        monitor.report_module("LLM_Chat", True, duration=time.time()-start_time)
+            logger.info(f"✅ 邮件生成完成: {email_subject[:50]}...")
 
-    except Exception as e:
-        logger.error(f"LLM调用失败: {e}", exc_info=True)
-        monitor.report_module("LLM_Chat", False, error=str(e), duration=time.time()-start_time)
-        # 生成错误通知邮件
-        email_subject = (
-            f"【系统错误】FinNews {datetime.now().strftime('%m/%d')} 生成失败"
-        )
-        email_html = f"""
-        <html>
-        <body>
-        <h1>FinNews 系统错误</h1>
-        <p>LLM调用失败: {str(e)}</p>
-        <p>时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
-        </body>
-        </html>
-        """
-        email_images = None
+            # HTML 模式下，email_plain 设为 None
+            email_plain = None
+
+            monitor.report_module("LLM_Chat", True, duration=time.time() - start_time)
+
+        except Exception as e:
+            logger.error(f"LLM调用失败: {e}", exc_info=True)
+            monitor.report_module(
+                "LLM_Chat", False, error=str(e), duration=time.time() - start_time
+            )
+            # 生成错误通知邮件
+            email_subject = (
+                f"【系统错误】FinNews {datetime.now().strftime('%m/%d')} 生成失败"
+            )
+            email_html = f"""
+            <html>
+            <body>
+            <h1>FinNews 系统错误</h1>
+            <p>LLM调用失败: {str(e)}</p>
+            <p>时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+            </body>
+            </html>
+            """
+            email_plain = None
+            email_images = None
 
     # ========================================
     monitor.start_step("邮件发送")
@@ -537,17 +654,33 @@ def main():
     )
 
     start_time = time.time()
-    email_sent = send_email_with_retry(
-        mailer=mailer,
-        subject=email_subject,
-        html_body=email_html,
-        email_from=Config.EMAIL_FROM,
-        to_list=to_list,
-        max_retries=3,
-        logger=logger,
-        images=email_images,
+
+    # 根据邮件内容类型选择发送方式
+    if email_content_type == "plain_text":
+        email_sent = send_email_with_retry(
+            mailer=mailer,
+            subject=email_subject,
+            plain_body=email_plain,
+            email_from=Config.EMAIL_FROM,
+            to_list=to_list,
+            max_retries=3,
+            logger=logger,
+        )
+    else:  # html
+        email_sent = send_email_with_retry(
+            mailer=mailer,
+            subject=email_subject,
+            html_body=email_html,
+            email_from=Config.EMAIL_FROM,
+            to_list=to_list,
+            max_retries=3,
+            logger=logger,
+            images=email_images,
+        )
+
+    monitor.report_module(
+        "GmailSmtpMailer", email_sent, duration=time.time() - start_time
     )
-    monitor.report_module("GmailSmtpMailer", email_sent, duration=time.time()-start_time)
 
     # ========================================
     # 9. 完成

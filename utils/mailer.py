@@ -95,3 +95,35 @@ class GmailSmtpMailer:
             if self.username and self.password:
                 server.login(self.username, self.password)
             server.sendmail(email_from, to_list, msg.as_string())
+
+    def send_plain(
+        self,
+        *,
+        subject: str,
+        plain_body: str,
+        email_from: str,
+        to_list: List[str],
+    ):
+        """
+        发送纯文本邮件（适用于 ASCII 艺术字符格式）
+
+        Args:
+            subject: 邮件标题
+            plain_body: 纯文本正文
+            email_from: 发件人
+            to_list: 收件人列表
+        """
+        if not to_list:
+            raise ValueError("to_list cannot be empty")
+
+        msg = MIMEText(plain_body, "plain", "utf-8")
+        msg["Subject"] = subject
+        msg["From"] = email_from
+        msg["To"] = ", ".join(to_list)
+
+        with smtplib.SMTP(self.host, self.port, timeout=30) as server:
+            if self.use_tls:
+                server.starttls()
+            if self.username and self.password:
+                server.login(self.username, self.password)
+            server.sendmail(email_from, to_list, msg.as_string())

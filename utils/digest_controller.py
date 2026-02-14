@@ -151,7 +151,22 @@ class DigestController:
         lines.append("## Flash窗口新闻 (12小时内)")
         if data.flash.news:
             for i, news in enumerate(data.flash.news[:15], 1):
-                lines.append(f"{i}. [{news.source}] {news.title}")
+                # 附加元数据辅助LLM排序
+                impact = f" [影响:{news.impact_tag}]" if news.impact_tag else ""
+                relevance = (
+                    f" [相关性:{news.relevance_score:.2f}]"
+                    if news.relevance_score
+                    else ""
+                )
+                url = f" URL:{news.url}" if news.url else ""
+                timestamp_str = (
+                    news.timestamp.strftime("%H:%M") if news.timestamp else ""
+                )
+                time_suffix = f" ({timestamp_str})" if timestamp_str else ""
+
+                lines.append(
+                    f"{i}. [{news.source}]{time_suffix} {news.title}{impact}{relevance}"
+                )
                 if news.summary:
                     summary = (
                         news.summary[:200] + "..."
@@ -159,6 +174,8 @@ class DigestController:
                         else news.summary
                     )
                     lines.append(f"   摘要: {summary}")
+                if url:
+                    lines.append(f"   {url}")
         else:
             lines.append("- 暂无")
         lines.append("")
@@ -167,7 +184,21 @@ class DigestController:
         lines.append("## Cycle窗口新闻 (7天内)")
         if data.cycle.news:
             for i, news in enumerate(data.cycle.news[:10], 1):
-                lines.append(f"{i}. [{news.source}] {news.title}")
+                impact = f" [影响:{news.impact_tag}]" if news.impact_tag else ""
+                relevance = (
+                    f" [相关性:{news.relevance_score:.2f}]"
+                    if news.relevance_score
+                    else ""
+                )
+                url = f" URL:{news.url}" if news.url else ""
+                timestamp_str = (
+                    news.timestamp.strftime("%H:%M") if news.timestamp else ""
+                )
+                time_suffix = f" ({timestamp_str})" if timestamp_str else ""
+
+                lines.append(
+                    f"{i}. [{news.source}]{time_suffix} {news.title}{impact}{relevance}"
+                )
                 if news.summary:
                     summary = (
                         news.summary[:150] + "..."
@@ -175,6 +206,8 @@ class DigestController:
                         else news.summary
                     )
                     lines.append(f"   摘要: {summary}")
+                if url:
+                    lines.append(f"   {url}")
         else:
             lines.append("- 暂无")
         lines.append("")
@@ -183,7 +216,21 @@ class DigestController:
         lines.append("## Trend窗口新闻 (30天内)")
         if data.trend.news:
             for i, news in enumerate(data.trend.news[:8], 1):
-                lines.append(f"{i}. [{news.source}] {news.title}")
+                impact = f" [影响:{news.impact_tag}]" if news.impact_tag else ""
+                relevance = (
+                    f" [相关性:{news.relevance_score:.2f}]"
+                    if news.relevance_score
+                    else ""
+                )
+                url = f" URL:{news.url}" if news.url else ""
+                timestamp_str = (
+                    news.timestamp.strftime("%H:%M") if news.timestamp else ""
+                )
+                time_suffix = f" ({timestamp_str})" if timestamp_str else ""
+
+                lines.append(
+                    f"{i}. [{news.source}]{time_suffix} {news.title}{impact}{relevance}"
+                )
                 if news.summary:
                     summary = (
                         news.summary[:150] + "..."
@@ -191,6 +238,8 @@ class DigestController:
                         else news.summary
                     )
                     lines.append(f"   摘要: {summary}")
+                if url:
+                    lines.append(f"   {url}")
         else:
             lines.append("- 暂无")
         lines.append("")
@@ -205,21 +254,30 @@ class DigestController:
         lines.append("   - 例如: 2026-01-20 市场日报：🔴 VIX红色警报 | 金价创历史新高")
         lines.append("")
         lines.append("2. 筛选重点新闻 (key_news)")
-        lines.append("   - 从上述新闻中选取5-8条最重要的")
+        lines.append("   - 恰好选择5条最重要的新闻（不多不少）")
+        lines.append("   - 优先级排序规则:")
+        lines.append("     1) 影响标签: Bullish/Bearish > Neutral")
+        lines.append("     2) 相关性评分: 越高越优先")
+        lines.append("     3) 时效性: 越新越优先")
         lines.append("   - 只陈述事实，不要添加分析")
-        lines.append("   - 每条包含: title, source, summary")
+        lines.append(
+            "   - 每条必须包含: title, source, summary, url, impact_tag, timestamp"
+        )
+        lines.append("   - url和timestamp若原始数据中无，则填空字符串")
         lines.append("")
         lines.append("3. 筛选其他新闻 (other_news)")
-        lines.append("   - 未入选重点的其他相关新闻")
+        lines.append("   - 最多5条值得关注的其他新闻，低相关性的直接丢弃")
         lines.append("   - 只陈述事实，不要添加分析")
-        lines.append("   - 每条包含: title, source, summary")
+        lines.append(
+            "   - 每条必须包含: title, source, summary, url, impact_tag, timestamp"
+        )
         lines.append("")
-        lines.append("4. 撰写市场分析 (analysis)")
+        lines.append("4. 撰写精简的市场分析 (analysis)")
         lines.append("   - market_sentiment: 当前市场情绪判断 (基于VIX和宏观数据)")
         lines.append("   - price_outlook: 黄金白银短期走势预判")
         lines.append("   - risk_factors: 需要关注的风险点")
         lines.append("   - trading_suggestion: 操作建议")
-        lines.append("   - 每项100-200字，专业但易懂")
+        lines.append("   - 每项30-60字，用要点式写作，专业但易懂")
         lines.append("")
 
         # 统计信息
@@ -390,6 +448,38 @@ class DigestController:
             MacroBias.NEUTRAL: "中性",
         }.get(signal.macro_bias, "中性")
 
+        # 情绪评分进度条 (sentiment_score: -1 到 +1)
+        sentiment_score = signal.sentiment_score
+        # 转换为 0-100% 范围用于显示
+        sentiment_percent = (sentiment_score + 1) * 50  # -1→0%, 0→50%, +1→100%
+
+        # 根据评分确定颜色
+        if sentiment_score > 0.3:
+            bar_color = "#28a745"  # 绿色 (利多)
+            sentiment_label = "利多"
+        elif sentiment_score < -0.3:
+            bar_color = "#dc3545"  # 红色 (利空)
+            sentiment_label = "利空"
+        else:
+            bar_color = "#6c757d"  # 灰色 (中性)
+            sentiment_label = "中性"
+
+        sentiment_bar_html = f"""
+            <div style="margin-top: 12px; padding: 12px; background-color: #ffffff; border: 1px solid #e9ecef; border-radius: 8px;">
+                <div style="font-size: 15px; color: #666; margin-bottom: 6px;">
+                    市场情绪评分: <span style="font-weight: 600; color: {bar_color};">{sentiment_score:+.2f}</span> ({sentiment_label})
+                </div>
+                <div style="width: 100%; height: 20px; background-color: #e9ecef; border-radius: 10px; overflow: hidden;">
+                    <div style="width: {sentiment_percent:.1f}%; height: 100%; background-color: {bar_color}; transition: width 0.3s ease;"></div>
+                </div>
+                <div style="font-size: 13px; color: #999; margin-top: 4px; display: flex; justify-content: space-between;">
+                    <span>-1.0 (极度利空)</span>
+                    <span>0 (中性)</span>
+                    <span>+1.0 (极度利多)</span>
+                </div>
+            </div>
+        """
+
         # 渲染完整HTML
         html = EMAIL_TEMPLATE.format(
             subject=subject,
@@ -401,6 +491,7 @@ class DigestController:
             vix_status=vix_status,
             vix_bg_color=vix_bg_color,
             macro_bias=macro_bias_text,
+            sentiment_bar=sentiment_bar_html,
             price_table=price_table_html,
             econ_section=econ_section_html,
             comex_section=comex_section_html,
@@ -421,15 +512,40 @@ class DigestController:
             title = news.get("title", "无标题")
             source = news.get("source", "未知来源")
             summary = news.get("summary", "")
+            url = news.get("url", "")
+            impact_tag = news.get("impact_tag", "Neutral")
+            timestamp = news.get("timestamp", "")
 
             # 最后一条不加底部边框
             border_style = (
                 "border-bottom: 1px solid #f0f0f0;" if i < len(news_list) - 1 else ""
             )
 
+            # impact_tag 彩色标签（中文显示）
+            impact_tag_map = {
+                "Bullish": ("利多", "#28a745", "#d4edda"),  # 绿色
+                "Bearish": ("利空", "#dc3545", "#f8d7da"),  # 红色
+                "Neutral": ("中性", "#6c757d", "#e9ecef"),  # 灰色
+            }
+            tag_text, tag_color, tag_bg = impact_tag_map.get(
+                impact_tag, ("中性", "#6c757d", "#e9ecef")
+            )
+            impact_tag_html = f'<span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 500; color: {tag_color}; background-color: {tag_bg}; margin-right: 8px;">{tag_text}</span>'
+
+            # 标题链接
+            if url:
+                title_html = f'<a href="{url}" style="font-size: 19px; font-weight: 600; color: #1a1a2e; text-decoration: none;" target="_blank">{title}</a>'
+            else:
+                title_html = f'<span style="font-size: 19px; font-weight: 600; color: #1a1a2e;">{title}</span>'
+
+            # 时间戳显示
+            timestamp_html = (
+                f'<span style="color: #999;"> · {timestamp}</span>' if timestamp else ""
+            )
+
             item_html = f"""<div style="padding: 12px 0; {border_style}">
-                <div style="font-size: 19px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px;">{title}</div>
-                <div style="font-size: 16px; color: #999; margin-bottom: 6px;">来源: {source}</div>
+                <div style="margin-bottom: 6px;">{impact_tag_html}{title_html}</div>
+                <div style="font-size: 16px; color: #999; margin-bottom: 6px;">来源: {source}{timestamp_html}</div>
                 {f'<div style="font-size: 17px; color: #555; line-height: 1.6;">{summary}</div>' if summary else ""}
             </div>"""
             items.append(item_html)
@@ -439,10 +555,10 @@ class DigestController:
     def _render_analysis(self, analysis: Dict[str, str]) -> str:
         """渲染市场分析HTML (与新闻格式统一，内联样式)"""
         sections = [
-            ("市场情绪", analysis.get("market_sentiment", "")),
-            ("走势预判", analysis.get("price_outlook", "")),
-            ("风险因素", analysis.get("risk_factors", "")),
-            ("操作建议", analysis.get("trading_suggestion", "")),
+            ("💭 市场情绪", analysis.get("market_sentiment", "")),
+            ("📈 走势预判", analysis.get("price_outlook", "")),
+            ("⚠️ 风险因素", analysis.get("risk_factors", "")),
+            ("💡 操作建议", analysis.get("trading_suggestion", "")),
         ]
 
         items = []
@@ -715,30 +831,79 @@ DIGEST_JSON_SCHEMA: Dict[str, Any] = {
             },
             "key_news": {
                 "type": "array",
-                "description": "重点新闻 (5-8条)，只陈述事实",
+                "description": "恰好5条重点新闻，只陈述事实",
+                "minItems": 5,
+                "maxItems": 5,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "title": {"type": "string"},
-                        "source": {"type": "string"},
-                        "summary": {"type": "string"},
+                        "title": {"type": "string", "description": "新闻标题（中文）"},
+                        "source": {"type": "string", "description": "新闻来源"},
+                        "summary": {
+                            "type": "string",
+                            "description": "新闻摘要（中文）",
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "新闻原文链接，无链接时返回空字符串",
+                        },
+                        "impact_tag": {
+                            "type": "string",
+                            "enum": ["Bullish", "Bearish", "Neutral"],
+                            "description": "对黄金白银的影响方向",
+                        },
+                        "timestamp": {
+                            "type": "string",
+                            "description": "新闻发布时间，格式 HH:MM，未知时返回空字符串",
+                        },
                     },
-                    "required": ["title", "source", "summary"],
+                    "required": [
+                        "title",
+                        "source",
+                        "summary",
+                        "url",
+                        "impact_tag",
+                        "timestamp",
+                    ],
                 },
             },
             "other_news": {
                 "type": "array",
-                "description": "其他新闻，只陈述事实",
+                "description": "其他新闻（最多5条），只陈述事实",
+                "maxItems": 5,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "title": {"type": "string"},
-                        "source": {"type": "string"},
-                        "summary": {"type": "string"},
+                        "title": {"type": "string", "description": "新闻标题（中文）"},
+                        "source": {"type": "string", "description": "新闻来源"},
+                        "summary": {
+                            "type": "string",
+                            "description": "新闻摘要（中文）",
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "新闻原文链接，无链接时返回空字符串",
+                        },
+                        "impact_tag": {
+                            "type": "string",
+                            "enum": ["Bullish", "Bearish", "Neutral"],
+                            "description": "对黄金白银的影响方向",
+                        },
+                        "timestamp": {
+                            "type": "string",
+                            "description": "新闻发布时间，格式 HH:MM，未知时返回空字符串",
+                        },
                     },
-                    "required": ["title", "source", "summary"],
+                    "required": [
+                        "title",
+                        "source",
+                        "summary",
+                        "url",
+                        "impact_tag",
+                        "timestamp",
+                    ],
                 },
             },
             "analysis": {
@@ -748,11 +913,20 @@ DIGEST_JSON_SCHEMA: Dict[str, Any] = {
                 "properties": {
                     "market_sentiment": {
                         "type": "string",
-                        "description": "市场情绪判断",
+                        "description": "市场情绪判断，30-60字要点式",
                     },
-                    "price_outlook": {"type": "string", "description": "走势预判"},
-                    "risk_factors": {"type": "string", "description": "风险因素"},
-                    "trading_suggestion": {"type": "string", "description": "操作建议"},
+                    "price_outlook": {
+                        "type": "string",
+                        "description": "走势预判，30-60字要点式",
+                    },
+                    "risk_factors": {
+                        "type": "string",
+                        "description": "风险因素，30-60字要点式",
+                    },
+                    "trading_suggestion": {
+                        "type": "string",
+                        "description": "操作建议，30-60字要点式",
+                    },
                 },
                 "required": [
                     "market_sentiment",
@@ -804,6 +978,7 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
                                     </td>
                                 </tr>
                             </table>
+                            {sentiment_bar}
                         </td>
                     </tr>
 

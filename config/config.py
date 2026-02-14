@@ -226,6 +226,17 @@ class Config:
     )  # 200万盎司
 
     # ========================================
+    # 邮件格式配置
+    # ========================================
+    # 邮件内容类型: "plain_text" (纯文本) | "html" (HTML邮件 + LLM摘要)
+    EMAIL_CONTENT_TYPE = _getenv_str("EMAIL_CONTENT_TYPE", "html")
+
+    # 纯文本邮件配置
+    EMAIL_FORMAT_MODE = _getenv_str("EMAIL_FORMAT_MODE", "full")  # "brief" | "full"
+    EMAIL_TOP_NEWS_COUNT = _getenv_int("EMAIL_TOP_NEWS_COUNT", "5")
+    EMAIL_MAX_SUMMARY_LENGTH = _getenv_int("EMAIL_MAX_SUMMARY_LENGTH", "80")
+
+    # ========================================
     # Tavily搜索关键词池 - 按时间窗口分组
     # ========================================
     # Flash Window (12小时) - 即时突发

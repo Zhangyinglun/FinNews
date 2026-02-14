@@ -1,0 +1,69 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/pyright/main/packages/vscode-pyright/schemas/pyrightconfig.schema.json",
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Windows",
+  "include": [
+    "scrapers",
+    "processors",
+    "analyzers",
+    "models",
+    "storage",
+    "utils",
+    "config",
+    "main.py",
+    "run_tests.py"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/outputs",
+    "**/.pytest_cache",
+    "**/.venv",
+    "**/venv",
+    "**/env"
+  ],
+  "ignore": [
+    "tests/**"
+  ],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportUnusedImport": false,
+  "reportUnusedVariable": false,
+  "reportDuplicateImport": true,
+  "reportIncompatibleMethodOverride": true,
+  "reportIncompatibleVariableOverride": true,
+  "reportUntypedFunctionDecorator": false,
+  "reportUntypedClassDecorator": false,
+  "reportUntypedBaseClass": false,
+  "reportPrivateUsage": false,
+  "reportConstantRedefinition": true,
+  "reportDeprecated": true,
+  "reportOptionalMemberAccess": false,
+  "reportOptionalSubscript": false,
+  "reportOptionalCall": false,
+  "reportOptionalIterable": false,
+  "reportOptionalContextManager": false,
+  "reportOptionalOperand": false,
+  "reportUnnecessaryIsInstance": false,
+  "reportUnnecessaryCast": false,
+  "reportUnnecessaryComparison": false,
+  "reportImplicitStringConcatenation": false,
+  "reportInvalidStubStatement": true,
+  "reportIncompleteStub": false,
+  "reportUnsupportedDunderAll": true,
+  "reportUnusedCallResult": false,
+  "venvPath": ".",
+  "venv": "venv",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.10",
+      "pythonPlatform": "Windows",
+      "extraPaths": [
+        "."
+      ]
+    }
+  ],
+  "stubPath": "typings"
+}
