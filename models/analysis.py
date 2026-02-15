@@ -98,44 +98,34 @@ class MarketSignal(BaseModel):
 
     def get_email_subject_tag(self) -> str:
         """
-        根据警报状态生成邮件标题标签
+        生成邮件标题标签
 
         Returns:
             邮件标题前缀
         """
-        if self.is_urgent:
-            return "【紧急警报】"
-        elif self.vix_alert_level == AlertLevel.WARNING:
-            return "【市场警戒】"
-        else:
-            return "【黄金日报】"
+        return "【市场日报】"
 
     def get_signal_summary(self) -> str:
         """
-        生成信号摘要文本
+        生成基于当日关键信息的标题摘要文本
 
         Returns:
             信号摘要字符串
         """
         parts = []
 
-        if self.vix_value is not None:
-            vix_emoji = (
-                "🔴"
-                if self.is_urgent
-                else ("⚠️" if self.vix_alert_level == AlertLevel.WARNING else "🟢")
-            )
-            parts.append(f"VIX {self.vix_value:.1f} {vix_emoji}")
+        if self.gold_change_percent is not None:
+            direction = "上涨" if self.gold_change_percent >= 0 else "下跌"
+            parts.append(f"黄金{direction}{abs(self.gold_change_percent):.2f}%")
+
+        if self.silver_change_percent is not None:
+            direction = "上涨" if self.silver_change_percent >= 0 else "下跌"
+            parts.append(f"白银{direction}{abs(self.silver_change_percent):.2f}%")
 
         if self.macro_bias != MacroBias.NEUTRAL:
-            bias_emoji = "📈" if self.macro_bias == MacroBias.BULLISH else "📉"
-            parts.append(f"{bias_emoji} {self.macro_bias.value}")
+            parts.append(f"宏观倾向{self.macro_bias.value}")
 
-        if self.gold_change_percent is not None:
-            gold_emoji = "🥇" if self.gold_change_percent > 0 else "🥇"
-            parts.append(f"黄金 {self.gold_change_percent:+.2f}%")
-
-        return " | ".join(parts) if parts else "市场平稳"
+        return "，".join(parts[:2]) if parts else "今日市场平稳"
 
 
 class AnalysisResult(BaseModel):

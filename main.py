@@ -514,9 +514,19 @@ def main():
             api_key=Config.OPENROUTER_API_KEY,
             model=Config.OPENROUTER_MODEL,
             timeout=Config.OPENROUTER_TIMEOUT,
+            total_timeout=Config.OPENROUTER_TOTAL_TIMEOUT,
             max_retries=Config.OPENROUTER_MAX_RETRIES,
             http_referer=Config.OPENROUTER_HTTP_REFERER,
             x_title=Config.OPENROUTER_X_TITLE,
+        )
+
+        logger.info(
+            "OpenRouter参数: model=%s, timeout=%ss, total_timeout=%ss, retries=%s, reasoning=%s",
+            Config.OPENROUTER_MODEL,
+            Config.OPENROUTER_TIMEOUT,
+            Config.OPENROUTER_TOTAL_TIMEOUT,
+            Config.OPENROUTER_MAX_RETRIES,
+            Config.OPENROUTER_REASONING_EFFORT,
         )
 
         # LLM系统提示 - 只返回结构化数据，不生成HTML
@@ -549,7 +559,7 @@ def main():
                     "type": "json_schema",
                     "json_schema": DIGEST_JSON_SCHEMA,
                 },
-                reasoning_effort="high",
+                reasoning_effort=Config.OPENROUTER_REASONING_EFFORT,
             )
 
             # 解析LLM响应
@@ -592,16 +602,11 @@ def main():
             if not email_html:
                 logger.warning("LLM数据解析失败，使用备用邮件内容")
                 email_html = f"""<!DOCTYPE html>
-<html><body style="font-family: Arial, sans-serif; padding: 20px;">
-<h1>FinNews 邮件生成失败</h1>
-<p>LLM未能生成有效的数据。</p>
-<p>时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
-<h2>规则引擎信号</h2>
-<ul>
-    <li>VIX: {market_signal.vix_value or "N/A"}</li>
-    <li>警报级别: {market_signal.vix_alert_level.value}</li>
-    <li>宏观倾向: {market_signal.macro_bias.value}</li>
-</ul>
+<html><body style="margin:0; padding:16px; background-color:#f0f2f5; font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif; color:#334155;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px; margin:0 auto; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+<tr><td style="padding:16px 18px; border-bottom:2px solid #ca8a04;"><h1 style="margin:0; font-size:20px; color:#0f172a;">FinNews 邮件生成失败</h1><p style="margin:8px 0 0 0; font-size:13px; color:#64748b;">时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p></td></tr>
+<tr><td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#475569;"><p style="margin:0 0 10px 0;">LLM 未能生成有效的数据。</p><p style="margin:0 0 8px 0; font-weight:600; color:#0f172a;">规则引擎信号</p><ul style="margin:0; padding-left:20px;"><li>VIX: {market_signal.vix_value or "N/A"}</li><li>警报级别: {market_signal.vix_alert_level.value}</li><li>宏观倾向: {market_signal.macro_bias.value}</li></ul></td></tr>
+</table>
 </body></html>"""
                 email_images = None  # 备用模式无图片
 
@@ -623,10 +628,20 @@ def main():
             )
             email_html = f"""
             <html>
-            <body>
-            <h1>FinNews 系统错误</h1>
-            <p>LLM调用失败: {str(e)}</p>
-            <p>时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+            <body style="margin:0; padding:16px; background-color:#f0f2f5; font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif; color:#334155;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px; margin:0 auto; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+                <tr>
+                    <td style="padding:16px 18px; border-bottom:2px solid #ef4444;">
+                        <h1 style="margin:0; font-size:20px; color:#0f172a;">FinNews 系统错误</h1>
+                        <p style="margin:8px 0 0 0; font-size:13px; color:#64748b;">时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#475569;">
+                        <p style="margin:0;">LLM调用失败: {str(e)}</p>
+                    </td>
+                </tr>
+            </table>
             </body>
             </html>
             """

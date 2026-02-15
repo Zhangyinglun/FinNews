@@ -410,6 +410,12 @@ class Config:
     OPENROUTER_MAX_TOKENS = _getenv_int("OPENROUTER_MAX_TOKENS", "8192")
     OPENROUTER_TIMEOUT = _getenv_int("OPENROUTER_TIMEOUT", "120")
     OPENROUTER_MAX_RETRIES = _getenv_int("OPENROUTER_MAX_RETRIES", "3")
+    # 总时限默认使用「单次超时 * 重试次数 + 缓冲」，避免单次请求耗尽全部预算
+    OPENROUTER_TOTAL_TIMEOUT = _getenv_int(
+        "OPENROUTER_TOTAL_TIMEOUT",
+        str(OPENROUTER_TIMEOUT * OPENROUTER_MAX_RETRIES + 10),
+    )
+    OPENROUTER_REASONING_EFFORT = _getenv_str("OPENROUTER_REASONING_EFFORT", "medium")
     OPENROUTER_HTTP_REFERER = _getenv_str_optional("OPENROUTER_HTTP_REFERER")
     OPENROUTER_X_TITLE = _getenv_str_optional("OPENROUTER_X_TITLE")
 

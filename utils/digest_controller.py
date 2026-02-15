@@ -58,11 +58,11 @@ class DigestController:
             (emoji, css_class, status_text)
         """
         if signal.is_urgent or signal.vix_alert_level == AlertLevel.CRITICAL:
-            return "🔴", "vix-red", "紧急"
+            return "!!", "vix-red", "紧急"
         elif signal.vix_alert_level == AlertLevel.WARNING:
-            return "⚠️", "vix-yellow", "警戒"
+            return "!", "vix-yellow", "警戒"
         else:
-            return "🟢", "vix-green", "正常"
+            return "OK", "vix-green", "正常"
 
     def build_llm_prompt(
         self, data: MultiWindowData, signal: MarketSignal
@@ -250,8 +250,9 @@ class DigestController:
         lines.append("=" * 60)
         lines.append("")
         lines.append("1. 生成邮件标题 (subject)")
-        lines.append("   - 格式: YYYY-MM-DD 市场日报：[关键信号] | [主要事件]")
-        lines.append("   - 例如: 2026-01-20 市场日报：🔴 VIX红色警报 | 金价创历史新高")
+        lines.append("   - 格式: YYYY-MM-DD 市场日报：[今日核心内容]")
+        lines.append("   - 要求: 不要在标题中固定使用VIX警报词或符号")
+        lines.append("   - 例如: 2026-01-20 市场日报：美联储表态偏鹰，金价高位震荡")
         lines.append("")
         lines.append("2. 筛选重点新闻 (key_news)")
         lines.append("   - 恰好选择5条最重要的新闻（不多不少）")
@@ -306,9 +307,8 @@ class DigestController:
         """
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d")
-        prefix = signal.get_email_subject_tag()
         summary = signal.get_signal_summary()
-        return f"{date_str} 市场日报：{prefix} | {summary}"
+        return f"{date_str} 市场日报：{summary}"
 
     def render_email_html(
         self,
@@ -332,33 +332,51 @@ class DigestController:
         now = datetime.now()
         images = {}
 
-        # ... (VIX logic remains same)
-        vix_emoji, vix_class, vix_status = self._get_vix_indicator(signal)
+        # VIX状态
+        _, vix_class, vix_status = self._get_vix_indicator(signal)
         vix_value = f"{signal.vix_value:.2f}" if signal.vix_value else "N/A"
-        vix_change = (
-            f"{signal.vix_change_percent:+.2f}%" if signal.vix_change_percent else "N/A"
+
+        # VIX状态胶囊
+        vix_badge_style_map = {
+            "vix-red": ("#991b1b", "#fee2e2"),
+            "vix-yellow": ("#854d0e", "#fef9c3"),
+            "vix-green": ("#166534", "#dcfce7"),
+        }
+        vix_badge_color, vix_badge_bg = vix_badge_style_map.get(
+            vix_class, ("#475569", "#e2e8f0")
+        )
+        vix_badge_html = (
+            '<span style="display: inline-block; padding: 2px 8px; '
+            "border-radius: 12px; font-size: 12px; font-weight: 600; "
+            f"color: {vix_badge_color}; background-color: {vix_badge_bg}; "
+            f'vertical-align: middle;">{vix_status}</span>'
         )
 
-        # VIX背景颜色
-        vix_bg_colors = {
-            "vix-red": "#f8d7da",
-            "vix-yellow": "#fff3cd",
-            "vix-green": "#d4edda",
-        }
-        vix_bg_color = vix_bg_colors.get(vix_class, "#f8f9fa")
+        if signal.vix_change_percent is not None:
+            vix_change_color = (
+                "#28a745" if signal.vix_change_percent >= 0 else "#dc3545"
+            )
+            vix_change_html = f'<span style="color: {vix_change_color}; font-weight: 600;">{signal.vix_change_percent:+.2f}%</span>'
+        else:
+            vix_change_html = '<span style="color: #94a3b8;">N/A</span>'
+
+        vix_market_row_html = f"""<tr style="background-color: #ffffff;">
+            <td style="padding: 11px 12px; text-align: left; font-size: 15px; color: #0f172a; border-bottom: 1px solid #e2e8f0;">VIX 恐慌指数</td>
+            <td style="padding: 11px 12px; text-align: right; font-size: 15px; color: #0f172a; border-bottom: 1px solid #e2e8f0;">{vix_value}</td>
+            <td style="padding: 11px 12px; text-align: right; font-size: 15px; color: #334155; border-bottom: 1px solid #e2e8f0;">{vix_change_html} {vix_badge_html}</td>
+        </tr>"""
 
         # 构建价格表行
         price_rows = []
-        has_any_value = False
+        has_any_value = signal.vix_value is not None
         price_data = [
             ("黄金 (XAU)", signal.gold_price, signal.gold_change_percent, "$", ""),
             ("白银 (XAG)", signal.silver_price, signal.silver_change_percent, "$", ""),
-            ("VIX 恐慌指数", signal.vix_value, signal.vix_change_percent, "", ""),
             ("美元指数 (DXY)", signal.dxy_value, signal.dxy_change_percent, "", ""),
             ("10年期国债", signal.us10y_value, signal.us10y_change_percent, "", "%"),
         ]
 
-        for name, value, change, prefix, suffix in price_data:
+        for idx, (name, value, change, prefix, suffix) in enumerate(price_data):
             if value is not None:
                 value_str = f"{prefix}{value:.2f}{suffix}"
                 has_any_value = True
@@ -371,10 +389,12 @@ class DigestController:
             else:
                 change_str = "-"
 
+            row_bg = "#ffffff" if idx % 2 == 0 else "#f8fafc"
+
             price_rows.append(f"""<tr>
-                <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">{name}</td>
-                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{value_str}</td>
-                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{change_str}</td>
+                <td style="padding: 10px 12px; text-align: left; font-size: 15px; color: #0f172a; background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">{name}</td>
+                <td style="padding: 10px 12px; text-align: right; font-size: 15px; color: #0f172a; background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">{value_str}</td>
+                <td style="padding: 10px 12px; text-align: right; font-size: 15px; background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">{change_str}</td>
             </tr>""")
 
         # 防御性编程：如果所有价格数据都缺失，仅记录日志
@@ -410,11 +430,12 @@ class DigestController:
             econ_content = " | ".join(econ_items)
             econ_section_html = f"""<tr>
         <td style="padding: 0 16px 20px 16px;">
-            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
-                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📅 经济指标</span>
+            <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
+                <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
+                    <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">经济指标</span>
                 </div>
-                <div style="padding: 12px; font-size: 16px; color: #333;">
+                <div style="padding: 14px; font-size: 15px; color: #334155; line-height: 1.6;">
                     {econ_content}
                 </div>
             </div>
@@ -448,7 +469,7 @@ class DigestController:
             MacroBias.NEUTRAL: "中性",
         }.get(signal.macro_bias, "中性")
 
-        # 情绪评分进度条 (sentiment_score: -1 到 +1)
+        # 情绪评分 (sentiment_score: -1 到 +1)
         sentiment_score = signal.sentiment_score
         # 转换为 0-100% 范围用于显示
         sentiment_percent = (sentiment_score + 1) * 50  # -1→0%, 0→50%, +1→100%
@@ -464,34 +485,31 @@ class DigestController:
             bar_color = "#6c757d"  # 灰色 (中性)
             sentiment_label = "中性"
 
-        sentiment_bar_html = f"""
-            <div style="margin-top: 12px; padding: 12px; background-color: #ffffff; border: 1px solid #e9ecef; border-radius: 8px;">
-                <div style="font-size: 15px; color: #666; margin-bottom: 6px;">
-                    市场情绪评分: <span style="font-weight: 600; color: {bar_color};">{sentiment_score:+.2f}</span> ({sentiment_label})
-                </div>
-                <div style="width: 100%; height: 20px; background-color: #e9ecef; border-radius: 10px; overflow: hidden;">
-                    <div style="width: {sentiment_percent:.1f}%; height: 100%; background-color: {bar_color}; transition: width 0.3s ease;"></div>
-                </div>
-                <div style="font-size: 13px; color: #999; margin-top: 4px; display: flex; justify-content: space-between;">
-                    <span>-1.0 (极度利空)</span>
-                    <span>0 (中性)</span>
-                    <span>+1.0 (极度利多)</span>
-                </div>
-            </div>
-        """
+        market_summary_row_html = f"""<tr style="background-color: #f8fafc;">
+            <td colspan="3" style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="font-size: 14px; color: #475569; vertical-align: middle;">
+                            宏观倾向: <span style="font-weight: 600; color: #0f172a;">{macro_bias_text}</span>
+                            <span style="color: #cbd5e1; margin: 0 8px;">|</span>
+                            市场情绪: <span style="font-weight: 600; color: {bar_color};">{sentiment_score:+.2f}</span> ({sentiment_label})
+                        </td>
+                        <td width="160" style="vertical-align: middle; padding-left: 12px;">
+                            <div style="width: 100%; height: 8px; background-color: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                                <div style="width: {sentiment_percent:.1f}%; height: 100%; background-color: {bar_color};"></div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>"""
 
         # 渲染完整HTML
         html = EMAIL_TEMPLATE.format(
             subject=subject,
             datetime=now.strftime("%Y-%m-%d %H:%M:%S"),
-            vix_class=vix_class,
-            vix_emoji=vix_emoji,
-            vix_value=vix_value,
-            vix_change=vix_change,
-            vix_status=vix_status,
-            vix_bg_color=vix_bg_color,
-            macro_bias=macro_bias_text,
-            sentiment_bar=sentiment_bar_html,
+            vix_market_row=vix_market_row_html,
+            market_summary_row=market_summary_row_html,
             price_table=price_table_html,
             econ_section=econ_section_html,
             comex_section=comex_section_html,
@@ -505,7 +523,7 @@ class DigestController:
     def _render_news_list(self, news_list: List[Dict[str, str]]) -> str:
         """渲染新闻列表HTML (内联样式，Gmail兼容)"""
         if not news_list:
-            return '<div style="padding: 12px 0; color: #999; font-size: 16px;">暂无相关新闻</div>'
+            return '<div style="padding: 14px 0; color: #64748b; font-size: 14px;">暂无相关新闻</div>'
 
         items = []
         for i, news in enumerate(news_list):
@@ -523,30 +541,32 @@ class DigestController:
 
             # impact_tag 彩色标签（中文显示）
             impact_tag_map = {
-                "Bullish": ("利多", "#28a745", "#d4edda"),  # 绿色
-                "Bearish": ("利空", "#dc3545", "#f8d7da"),  # 红色
-                "Neutral": ("中性", "#6c757d", "#e9ecef"),  # 灰色
+                "Bullish": ("利多", "#166534", "#dcfce7"),
+                "Bearish": ("利空", "#991b1b", "#fee2e2"),
+                "Neutral": ("中性", "#475569", "#e2e8f0"),
             }
             tag_text, tag_color, tag_bg = impact_tag_map.get(
                 impact_tag, ("中性", "#6c757d", "#e9ecef")
             )
-            impact_tag_html = f'<span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 500; color: {tag_color}; background-color: {tag_bg}; margin-right: 8px;">{tag_text}</span>'
+            impact_tag_html = f'<span style="display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; color: {tag_color}; background-color: {tag_bg}; margin-right: 8px; vertical-align: middle;">{tag_text}</span>'
 
             # 标题链接
             if url:
-                title_html = f'<a href="{url}" style="font-size: 19px; font-weight: 600; color: #1a1a2e; text-decoration: none;" target="_blank">{title}</a>'
+                title_html = f'<a href="{url}" style="font-size: 16px; font-weight: 600; color: #0f172a; text-decoration: none; line-height: 1.5;" target="_blank">{title}</a>'
             else:
-                title_html = f'<span style="font-size: 19px; font-weight: 600; color: #1a1a2e;">{title}</span>'
+                title_html = f'<span style="font-size: 16px; font-weight: 600; color: #0f172a; line-height: 1.5;">{title}</span>'
 
             # 时间戳显示
             timestamp_html = (
-                f'<span style="color: #999;"> · {timestamp}</span>' if timestamp else ""
+                f'<span style="color: #94a3b8;"> · {timestamp}</span>'
+                if timestamp
+                else ""
             )
 
-            item_html = f"""<div style="padding: 12px 0; {border_style}">
-                <div style="margin-bottom: 6px;">{impact_tag_html}{title_html}</div>
-                <div style="font-size: 16px; color: #999; margin-bottom: 6px;">来源: {source}{timestamp_html}</div>
-                {f'<div style="font-size: 17px; color: #555; line-height: 1.6;">{summary}</div>' if summary else ""}
+            item_html = f"""<div style="padding: 14px 0; {border_style}">
+                <div style="margin-bottom: 8px;">{impact_tag_html}{title_html}</div>
+                <div style="font-size: 13px; color: #64748b; margin-bottom: 7px;">来源: {source}{timestamp_html}</div>
+                {f'<div style="font-size: 14px; color: #334155; line-height: 1.7;">{summary}</div>' if summary else ""}
             </div>"""
             items.append(item_html)
 
@@ -555,10 +575,10 @@ class DigestController:
     def _render_analysis(self, analysis: Dict[str, str]) -> str:
         """渲染市场分析HTML (与新闻格式统一，内联样式)"""
         sections = [
-            ("💭 市场情绪", analysis.get("market_sentiment", "")),
-            ("📈 走势预判", analysis.get("price_outlook", "")),
-            ("⚠️ 风险因素", analysis.get("risk_factors", "")),
-            ("💡 操作建议", analysis.get("trading_suggestion", "")),
+            ("市场情绪", analysis.get("market_sentiment", "")),
+            ("走势预判", analysis.get("price_outlook", "")),
+            ("风险因素", analysis.get("risk_factors", "")),
+            ("操作建议", analysis.get("trading_suggestion", "")),
         ]
 
         items = []
@@ -572,16 +592,43 @@ class DigestController:
                 else ""
             )
 
-            item_html = f"""<div style="padding: 12px 0; {border_style}">
-                <div style="font-size: 18px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px;">{title}</div>
-                <div style="font-size: 17px; color: #555; line-height: 1.6;">{content}</div>
+            item_html = f"""<div style="padding: 14px 0; {border_style}">
+                <div style="margin-bottom: 7px;">
+                    <span style="display: inline-block; width: 3px; height: 14px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                    <span style="font-size: 16px; font-weight: 600; color: #0f172a; vertical-align: middle;">{title}</span>
+                </div>
+                <div style="font-size: 14px; color: #334155; line-height: 1.7; padding-left: 11px;">{content}</div>
             </div>"""
             items.append(item_html)
 
         if not items:
-            return '<div style="padding: 12px 0; color: #999; font-size: 16px;">暂无分析内容</div>'
+            return '<div style="padding: 14px 0; color: #64748b; font-size: 14px;">暂无分析内容</div>'
 
         return "\n".join(items)
+
+    def _get_comex_badge_style(
+        self, alert_level: Optional[ComexAlertLevel]
+    ) -> Tuple[str, str, str]:
+        """根据COMEX预警等级返回状态徽章样式。"""
+        badge_style_map: Dict[Optional[ComexAlertLevel], Tuple[str, str, str]] = {
+            ComexAlertLevel.SAFE: ("正常", "#166534", "#dcfce7"),
+            ComexAlertLevel.YELLOW: ("需关注", "#854d0e", "#fef9c3"),
+            ComexAlertLevel.RED: ("高风险", "#991b1b", "#fee2e2"),
+            ComexAlertLevel.SYSTEM_FAILURE: ("系统风险", "#f8fafc", "#1e293b"),
+            None: ("数据缺失", "#475569", "#e2e8f0"),
+        }
+        return badge_style_map.get(alert_level, badge_style_map[None])
+
+    def _render_comex_badge(self, alert_level: Optional[ComexAlertLevel]) -> str:
+        """渲染COMEX状态胶囊徽章HTML。"""
+        badge_text, text_color, bg_color = self._get_comex_badge_style(alert_level)
+        return (
+            '<span style="display: inline-block; padding: 2px 8px; '
+            "border-radius: 12px; font-size: 12px; font-weight: 600; "
+            f"color: {text_color}; background-color: {bg_color}; "
+            'vertical-align: middle;">'
+            f"{badge_text}</span>"
+        )
 
     def _get_comex_indicator(
         self, comex_signal: Optional[ComexSignal]
@@ -593,21 +640,21 @@ class DigestController:
             comex_signal: COMEX信号对象
 
         Returns:
-            (emoji, css_class, status_text, bg_color)
+            (indicator_text, css_class, status_text, bg_color)
         """
         if comex_signal is None:
-            return "❓", "comex-unknown", "数据缺失", "#f8f9fa"
+            return "数据缺失", "comex-unknown", "数据缺失", "#e2e8f0"
 
         worst_level = comex_signal.get_worst_alert_level()
 
         if worst_level == ComexAlertLevel.SYSTEM_FAILURE:
-            return "⚫", "comex-black", "系统风险", "#343a40"
+            return "系统风险", "comex-black", "系统风险", "#1e293b"
         elif worst_level == ComexAlertLevel.RED:
-            return "🔴", "comex-red", "高风险", "#f8d7da"
+            return "高风险", "comex-red", "高风险", "#fee2e2"
         elif worst_level == ComexAlertLevel.YELLOW:
-            return "🟡", "comex-yellow", "需关注", "#fff3cd"
+            return "需关注", "comex-yellow", "需关注", "#fef9c3"
         else:
-            return "🟢", "comex-green", "正常", "#d4edda"
+            return "正常", "comex-green", "正常", "#dcfce7"
 
     def _render_comex_section(
         self, comex_signal: Optional[ComexSignal]
@@ -624,19 +671,10 @@ class DigestController:
         if comex_signal is None:
             return "", {}
 
-        emoji, css_class, status_text, bg_color = self._get_comex_indicator(
-            comex_signal
-        )
-
         # 构建白银行
         silver_rows = []
         if comex_signal.silver_registered_million is not None:
-            silver_emoji = {
-                ComexAlertLevel.SYSTEM_FAILURE: "⚫",
-                ComexAlertLevel.RED: "🔴",
-                ComexAlertLevel.YELLOW: "🟡",
-                ComexAlertLevel.SAFE: "🟢",
-            }.get(comex_signal.silver_alert_level, "")
+            silver_badge = self._render_comex_badge(comex_signal.silver_alert_level)
 
             daily_str = ""
             weekly_str = ""
@@ -659,20 +697,15 @@ class DigestController:
             change_str = " ".join(filter(None, [daily_str, weekly_str]))
 
             silver_rows.append(f"""<tr>
-                <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">白银 (Registered)</td>
-                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.silver_registered_million:.2f}M oz</td>
-                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{silver_emoji} {change_str}</td>
+                <td style="padding: 10px 12px; text-align: left; font-size: 15px; color: #0f172a; background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">白银 (Registered)</td>
+                <td style="padding: 10px 12px; text-align: right; font-size: 15px; color: #0f172a; background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">{comex_signal.silver_registered_million:.2f}M oz</td>
+                <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #334155; background-color: #ffffff; border-bottom: 1px solid #e2e8f0;">{silver_badge} {change_str}</td>
             </tr>""")
 
         # 构建黄金行
         gold_rows = []
         if comex_signal.gold_registered_million is not None:
-            gold_emoji = {
-                ComexAlertLevel.SYSTEM_FAILURE: "⚫",
-                ComexAlertLevel.RED: "🔴",
-                ComexAlertLevel.YELLOW: "🟡",
-                ComexAlertLevel.SAFE: "🟢",
-            }.get(comex_signal.gold_alert_level, "")
+            gold_badge = self._render_comex_badge(comex_signal.gold_alert_level)
 
             daily_str = ""
             weekly_str = ""
@@ -691,9 +724,9 @@ class DigestController:
             change_str = " ".join(filter(None, [daily_str, weekly_str]))
 
             gold_rows.append(f"""<tr>
-                <td style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0;">黄金 (Registered)</td>
-                <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #f0f0f0;">{comex_signal.gold_registered_million:.2f}M oz</td>
-                <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #f0f0f0;">{gold_emoji} {change_str}</td>
+                <td style="padding: 10px 12px; text-align: left; font-size: 15px; color: #0f172a; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">黄金 (Registered)</td>
+                <td style="padding: 10px 12px; text-align: right; font-size: 15px; color: #0f172a; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">{comex_signal.gold_registered_million:.2f}M oz</td>
+                <td style="padding: 10px 12px; text-align: center; font-size: 13px; color: #334155; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0;">{gold_badge} {change_str}</td>
             </tr>""")
 
         if not silver_rows and not gold_rows:
@@ -703,9 +736,15 @@ class DigestController:
 
         # 构建警报消息
         alert_messages = []
-        if comex_signal.silver_alert_message:
+        if (
+            comex_signal.silver_alert_message
+            and comex_signal.silver_alert_level != ComexAlertLevel.SAFE
+        ):
             alert_messages.append(comex_signal.silver_alert_message)
-        if comex_signal.gold_alert_message:
+        if (
+            comex_signal.gold_alert_message
+            and comex_signal.gold_alert_level != ComexAlertLevel.SAFE
+        ):
             alert_messages.append(comex_signal.gold_alert_message)
 
         alert_html = ""
@@ -716,7 +755,7 @@ class DigestController:
                     for msg in alert_messages
                 ]
             )
-            alert_html = f"""<div style="padding: 10px 12px; font-size: 16px; background-color: #fafafa; border-top: 1px solid #e9ecef;">
+            alert_html = f"""<div style="padding: 10px 12px; font-size: 16px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
                 {alert_items}
             </div>"""
 
@@ -737,11 +776,11 @@ class DigestController:
         if recommendations:
             rec_items = "".join(
                 [
-                    f'<div style="margin-bottom: 4px;">💡 {rec}</div>'
+                    f'<div style="margin-bottom: 4px;">建议: {rec}</div>'
                     for rec in recommendations
                 ]
             )
-            rec_html = f"""<div style="padding: 10px 12px; font-size: 16px; color: #856404; background-color: #fff3cd; border-top: 1px solid #e9ecef;">
+            rec_html = f"""<div style="padding: 10px 12px; font-size: 16px; color: #854d0e; background-color: #fef3c7; border-top: 1px solid #fde68a;">
                 {rec_items}
             </div>"""
 
@@ -778,7 +817,7 @@ class DigestController:
                     </div>
                 """)
 
-            charts_html = f"""<div style="padding: 12px; background-color: #fafafa; border-top: 1px solid #e9ecef;">
+            charts_html = f"""<div style="padding: 12px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
                 {"".join(chart_items)}
             </div>"""
 
@@ -793,15 +832,16 @@ class DigestController:
             f"""<!-- COMEX Inventory Section -->
         <tr>
             <td style="padding: 0 16px 20px 16px;">
-                <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                    <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
-                        <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">🏦 COMEX库存监控{report_date_str}</span>
+                <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
+                    <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
+                        <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                        <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">COMEX库存监控{report_date_str}</span>
                     </div>
-                    <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 18px;">
-                        <tr style="background-color: #f8f9fa;">
-                            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">品种</th>
-                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">库存</th>
-                            <th style="padding: 10px 12px; text-align: center; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">状态</th>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 15px;">
+                        <tr style="background-color: #f8fafc;">
+                            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #334155; font-size: 14px; border-bottom: 1px solid #e2e8f0;">品种</th>
+                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #334155; font-size: 14px; border-bottom: 1px solid #e2e8f0;">库存</th>
+                            <th style="padding: 10px 12px; text-align: center; font-weight: 600; color: #334155; font-size: 14px; border-bottom: 1px solid #e2e8f0;">状态</th>
                         </tr>
                         {table_rows}
                     </table>
@@ -827,7 +867,7 @@ DIGEST_JSON_SCHEMA: Dict[str, Any] = {
         "properties": {
             "subject": {
                 "type": "string",
-                "description": "邮件标题，格式: YYYY-MM-DD 市场日报：[信号] | [事件]",
+                "description": "邮件标题，格式: YYYY-MM-DD 市场日报：[今日核心内容]",
             },
             "key_news": {
                 "type": "array",
@@ -950,50 +990,35 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 8px 0;">
+<body style="margin: 0; padding: 0; background-color: #f0f2f5; font-family: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0f2f5; padding: 14px 0;">
         <tr>
             <td align="center">
-                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 620px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(15,23,42,0.12);">
                     
                     <!-- Header -->
                     <tr>
-                        <td style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 20px 16px;">
-                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">{subject}</h1>
-                            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.7); font-size: 14px;">生成时间: {datetime}</p>
-                        </td>
-                    </tr>
-
-                    <!-- VIX Signal -->
-                    <tr>
-                        <td style="padding: 16px 16px 12px 16px;">
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; padding: 12px;">
-                                <tr>
-                                    <td width="50" style="vertical-align: middle; padding: 10px;">
-                                        <div style="width: 48px; height: 48px; border-radius: 50%; background-color: {vix_bg_color}; text-align: center; line-height: 48px; font-size: 26px;">{vix_emoji}</div>
-                                    </td>
-                                    <td style="vertical-align: middle; padding: 10px;">
-                                        <div style="font-size: 20px; font-weight: 600; color: #1a1a2e;">VIX: {vix_value} <span style="font-weight: 400; color: #666;">({vix_change})</span></div>
-                                        <div style="font-size: 16px; color: #666; margin-top: 4px;">市场状态: {vix_status} | 宏观倾向: {macro_bias}</div>
-                                    </td>
-                                </tr>
-                            </table>
-                            {sentiment_bar}
+                        <td style="background: #1e293b; background-image: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-bottom: 2px solid #ca8a04; padding: 22px 18px;">
+                            <h1 style="margin: 0; color: #f8fafc; font-size: 22px; line-height: 1.4; font-weight: 700;">{subject}</h1>
+                            <p style="margin: 9px 0 0 0; color: #cbd5e1; font-size: 13px;">生成时间: {datetime}</p>
                         </td>
                     </tr>
 
                     <!-- Section 1: Market Data -->
                     <tr>
                         <td style="padding: 0 16px 20px 16px;">
-                            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📈 市场行情</span>
+                            <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
+                                <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
+                                    <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">市场行情</span>
                                 </div>
-                                <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 18px;">
-                                    <tr style="background-color: #f8f9fa;">
-                                        <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">品种</th>
-                                        <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">价格</th>
-                                        <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #666; font-size: 16px; border-bottom: 1px solid #e9ecef;">涨跌</th>
+                                <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 15px;">
+                                    {vix_market_row}
+                                    {market_summary_row}
+                                    <tr style="background-color: #f8fafc;">
+                                        <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #334155; font-size: 14px; border-bottom: 1px solid #e2e8f0;">品种</th>
+                                        <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #334155; font-size: 14px; border-bottom: 1px solid #e2e8f0;">价格</th>
+                                        <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #334155; font-size: 14px; border-bottom: 1px solid #e2e8f0;">涨跌</th>
                                     </tr>
                                     {price_table}
                                 </table>
@@ -1010,11 +1035,12 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
                     <!-- Section 2: Key News -->
                     <tr>
                         <td style="padding: 0 16px 20px 16px;">
-                            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📰 重点新闻</span>
+                            <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
+                                <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
+                                    <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">重点新闻</span>
                                 </div>
-                                <div style="padding: 8px 12px;">
+                                <div style="padding: 10px 16px;">
                                     {key_news}
                                 </div>
                             </div>
@@ -1024,11 +1050,12 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
                     <!-- Section 3: Other News -->
                     <tr>
                         <td style="padding: 0 16px 20px 16px;">
-                            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">📋 其他新闻</span>
+                            <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
+                                <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
+                                    <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">其他新闻</span>
                                 </div>
-                                <div style="padding: 8px 12px;">
+                                <div style="padding: 10px 16px;">
                                     {other_news}
                                 </div>
                             </div>
@@ -1038,11 +1065,12 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
                     <!-- Section 4: Analysis -->
                     <tr>
                         <td style="padding: 0 16px 20px 16px;">
-                            <div style="border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden;">
-                                <div style="background-color: #f8f9fa; padding: 10px 12px; border-bottom: 1px solid #e9ecef;">
-                                    <span style="font-size: 20px; font-weight: 600; color: #1a1a2e;">🔍 市场分析</span>
+                            <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
+                                <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
+                                    <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
+                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">市场分析</span>
                                 </div>
-                                <div style="padding: 8px 12px;">
+                                <div style="padding: 10px 16px;">
                                     {analysis}
                                 </div>
                             </div>
@@ -1051,9 +1079,9 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
 
                     <!-- Footer -->
                     <tr>
-                        <td style="padding: 16px 16px; background-color: #f8f9fa; border-top: 1px solid #e9ecef;">
-                            <p style="margin: 0; font-size: 14px; color: #999; text-align: center;">FinNews - 黄金白银市场智能分析系统</p>
-                            <p style="margin: 6px 0 0 0; font-size: 13px; color: #bbb; text-align: center;">本报告由AI自动生成，仅供参考，不构成投资建议</p>
+                        <td style="padding: 18px 16px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+                            <p style="margin: 0; font-size: 14px; color: #475569; text-align: center; font-weight: 600;">FinNews | 黄金白银市场智能分析系统</p>
+                            <p style="margin: 6px 0 0 0; font-size: 12px; color: #64748b; text-align: center;">本报告由 AI 自动生成，仅供参考，不构成投资建议</p>
                         </td>
                     </tr>
 
