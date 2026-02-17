@@ -2,11 +2,12 @@
 测试 Config 配置模块
 """
 
+from pathlib import Path
 import sys
 import os
 import importlib
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from config.config import Config
 from utils.logger import setup_logger

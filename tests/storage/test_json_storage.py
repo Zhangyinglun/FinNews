@@ -4,7 +4,7 @@
 
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from storage.json_storage import JSONStorage
 from utils.logger import setup_logger
@@ -168,7 +168,7 @@ def test_json_storage():
     print("..." if len(markdown_content) > 800 else "")
 
     # 保存测试结果摘要
-    output_file = "D:\\Projects\\FinNews\\tests\\storage\\test_results.json"
+    output_file = "str(Path(__file__).resolve().parent / 'test_results.json')"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {

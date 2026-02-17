@@ -10,9 +10,10 @@ Run:
   python -m tests.utils.test_gmail_smtp
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from config.config import Config
 from utils.mailer import GmailSmtpMailer

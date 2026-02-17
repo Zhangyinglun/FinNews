@@ -3,12 +3,13 @@
 """
 
 import os
+from pathlib import Path
 import sys
 from typing import Dict, List
 
 os.environ["OPENROUTER_API_KEY"] = "dummy"
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from config.config import Config
 from scrapers.sonar_scraper import SonarScraper

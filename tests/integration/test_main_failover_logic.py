@@ -2,12 +2,13 @@
 集成测试：验证 main.py 中的价格补全 (Failover) 逻辑
 """
 
+from pathlib import Path
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
 from datetime import datetime
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers import YFinanceScraper, StooqScraper
 from utils.price_cache_manager import PriceCacheManager

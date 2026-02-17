@@ -2,9 +2,10 @@
 测试 RSS 数据源
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.rss_scraper import RSSFeedScraper
 from utils.logger import setup_logger
@@ -49,7 +50,7 @@ def test_rss_scraper():
         print("-" * 80)
 
     # 保存为 JSON 方便查看
-    output_file = "D:\\Projects\\FinNews\\tests\\scrapers\\output_rss.json"
+    output_file = "str(Path(__file__).resolve().parent / 'output_rss.json')"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 

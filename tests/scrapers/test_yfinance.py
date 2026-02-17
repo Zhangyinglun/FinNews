@@ -3,10 +3,11 @@
 """
 
 import os
+from pathlib import Path
 import sys
 import json
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.yfinance_scraper import YFinanceScraper
 from utils.logger import setup_logger
@@ -77,7 +78,7 @@ def test_yfinance_scraper():
             print("-" * 80)
 
     # 保存为 JSON
-    output_file = "D:\\Projects\\FinNews\\tests\\scrapers\\output_yfinance.json"
+    output_file = "str(Path(__file__).resolve().parent / 'output_yfinance.json')"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 

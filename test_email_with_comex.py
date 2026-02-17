@@ -5,7 +5,7 @@
 
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import json
 from pathlib import Path

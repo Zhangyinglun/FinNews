@@ -2,9 +2,10 @@
 测试 ContentFetcher 完整内容抓取
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.content_fetcher import ContentFetcher
 from utils.logger import setup_logger
@@ -89,7 +90,7 @@ def test_content_fetcher():
         print(f"内容长度: {article.get('content_length', 0)} 字符")
 
     # 保存结果
-    output_file = "D:\\Projects\\FinNews\\tests\\scrapers\\output_content_fetcher.json"
+    output_file = "str(Path(__file__).resolve().parent / 'output_content_fetcher.json')"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {"single_tests": results, "enriched_articles": enriched},

@@ -8,11 +8,12 @@ Run:
   python -m tests.utils.test_openrouter_digest
 """
 
+from pathlib import Path
 import sys
 import json
 from datetime import datetime
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from config.config import Config
 from utils.digest_controller import DIGEST_JSON_SCHEMA, DigestController

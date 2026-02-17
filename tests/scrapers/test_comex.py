@@ -2,9 +2,10 @@
 测试 COMEX 库存数据爬虫和查询函数
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.comex_scraper import ComexScraper
 from utils.comex_query import get_comex_snapshot, get_comex_summary
@@ -141,7 +142,7 @@ except Exception as e:
 print("\n" + "=" * 80)
 print("保存测试结果\n")
 
-output_file = "D:\\Projects\\FinNews\\test_comex_output.json"
+output_file = Path(__file__).resolve().parent.parent.parent / "test_comex_output.json"
 try:
     output_data = {
         "scraper_data": data,

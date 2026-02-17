@@ -16,7 +16,7 @@ from pathlib import Path
 from datetime import datetime
 from copy import deepcopy
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from config.config import Config
 from utils.digest_controller import DIGEST_JSON_SCHEMA, DigestController

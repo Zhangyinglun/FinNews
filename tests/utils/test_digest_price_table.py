@@ -2,9 +2,10 @@
 测试价格表在数据缺失时仍显示内容
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from models.analysis import MarketSignal
 from models.market_data import MultiWindowData

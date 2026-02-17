@@ -2,9 +2,10 @@
 测试 DataCleaner 数据清洗模块
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from processors.cleaner import DataCleaner
 from utils.logger import setup_logger
@@ -87,7 +88,7 @@ def test_data_cleaner():
         print("-" * 80)
 
     # 保存结果
-    output_file = "D:\\Projects\\FinNews\\tests\\processors\\output_cleaner.json"
+    output_file = "str(Path(__file__).resolve().parent / 'output_cleaner.json')"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {

@@ -2,9 +2,10 @@
 测试 StooqScraper 是否能正常获取行情
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.stooq_scraper import StooqScraper
 from config.config import Config

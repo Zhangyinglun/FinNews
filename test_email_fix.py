@@ -3,9 +3,10 @@
 验证 analyzer 变量名和 SonarScraper 导入问题已修复
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from analyzers.market_analyzer import MarketAnalyzer
 from analyzers.rule_engine import RuleEngine

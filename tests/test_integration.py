@@ -2,9 +2,10 @@
 集成测试 - 测试完整的数据管道
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scrapers import YFinanceScraper, FREDScraper
 from processors import DataCleaner, Deduplicator

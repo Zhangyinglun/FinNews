@@ -3,9 +3,10 @@
 验证: 情绪评分进度条、impact_tag 彩色标签、URL 链接、时间戳
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from datetime import datetime
 from utils.digest_controller import DigestController
@@ -255,7 +256,7 @@ def main():
     print()
 
     # 保存 HTML 到文件
-    output_path = "D:\\Projects\\FinNews\\outputs\\html_email_improvements_test.html"
+    output_path = Path(__file__).resolve().parent / "outputs" / "html_email_improvements_test.html"
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
 

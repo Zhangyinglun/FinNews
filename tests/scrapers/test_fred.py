@@ -2,9 +2,10 @@
 测试 FRED 数据源
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.fred_scraper import FREDScraper
 from utils.logger import setup_logger
@@ -45,7 +46,7 @@ def test_fred_scraper():
         print("-" * 80)
 
     # 保存为 JSON 方便查看
-    output_file = "D:\\Projects\\FinNews\\tests\\scrapers\\output_fred.json"
+    output_file = "str(Path(__file__).resolve().parent / 'output_fred.json')"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 

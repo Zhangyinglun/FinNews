@@ -3,9 +3,10 @@
 验证修改后 HTML 模式是否正常工作
 """
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config.config import Config
 from utils.digest_controller import DigestController

@@ -1,8 +1,9 @@
 """测试 SonarScraper 是否可从 scrapers 导出"""
 
+from pathlib import Path
 import sys
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def test_sonar_scraper_export() -> None:
