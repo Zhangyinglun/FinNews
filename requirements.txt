@@ -4,14 +4,14 @@
 # ========================================
 # Web Scraping & API Clients
 # ========================================
-tavily-python==0.5.0          # Tavily API客户端 - 新闻搜索
-ddgs>=9.0.0                   # DuckDuckGo搜索 - 免费替代方案
+tavily-python==0.7.21         # Tavily API客户端 - 新闻搜索
+ddgs>=9.10.0                  # DuckDuckGo搜索 - 免费替代方案
 yfinance>=1.2.0               # Yahoo Finance数据 - 价格&新闻 (修复cookie bug)
-feedparser==6.0.11            # RSS解析 - Kitco/FXStreet
+feedparser==6.0.12            # RSS解析 - Kitco/FXStreet
 fredapi==0.5.2                # FRED API - 宏观经济数据
 alpha-vantage==2.3.1          # Alpha Vantage (备选)
-requests==2.32.3              # HTTP请求
-beautifulsoup4==4.12.3        # HTML解析
+requests==2.32.5              # HTTP请求
+beautifulsoup4==4.13.3        # HTML解析
 lxml==5.3.0                   # XML解析器(feedparser依赖)
 xlrd==2.0.1                   # Excel解析器(COMEX数据)
 
@@ -26,7 +26,7 @@ Pillow>=10.0.0                # 图像处理 (COMEX图表)
 # ========================================
 # Data Models
 # ========================================
-pydantic==2.10.3              # 数据模型验证
+pydantic==2.12.5             # 数据模型验证
 
 # ========================================
 # Storage (APScheduler已移除)
@@ -36,15 +36,15 @@ pydantic==2.10.3              # 数据模型验证
 # ========================================
 # Utilities
 # ========================================
-python-dotenv==1.0.1          # 环境变量管理
+python-dotenv==1.2.1          # 环境变量管理
 pyyaml==6.0.2                 # YAML配置支持
-pytz==2024.2                  # 时区处理
+pytz==2025.2                  # 时区处理
 
 # ========================================
 # Logging & Monitoring
 # ========================================
-colorlog==6.9.0               # 彩色日志输出
-tqdm==4.67.1                  # 进度条显示
+colorlog==6.10.1              # 彩色日志输出
+tqdm==4.67.3                  # 进度条显示
 
 # ========================================
 # Network Optimization (yfinance优化)
