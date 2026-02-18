@@ -46,9 +46,7 @@ def test_alpha_vantage_scraper():
             print("-" * 80)
 
         # 保存为 JSON 方便查看
-        output_file = (
-            "str(Path(__file__).resolve().parent / 'output_alpha_vantage.json')"
-        )
+        output_file = str(Path(__file__).resolve().parent / "output_alpha_vantage.json")
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 

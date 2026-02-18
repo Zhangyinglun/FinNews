@@ -168,7 +168,7 @@ def test_json_storage():
     print("..." if len(markdown_content) > 800 else "")
 
     # 保存测试结果摘要
-    output_file = "str(Path(__file__).resolve().parent / 'test_results.json')"
+    output_file = str(Path(__file__).resolve().parent / "test_results.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {

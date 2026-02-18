@@ -50,7 +50,7 @@ def test_rss_scraper():
         print("-" * 80)
 
     # 保存为 JSON 方便查看
-    output_file = "str(Path(__file__).resolve().parent / 'output_rss.json')"
+    output_file = str(Path(__file__).resolve().parent / "output_rss.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 

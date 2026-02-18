@@ -90,7 +90,7 @@ def test_content_fetcher():
         print(f"内容长度: {article.get('content_length', 0)} 字符")
 
     # 保存结果
-    output_file = "str(Path(__file__).resolve().parent / 'output_content_fetcher.json')"
+    output_file = str(Path(__file__).resolve().parent / "output_content_fetcher.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {"single_tests": results, "enriched_articles": enriched},

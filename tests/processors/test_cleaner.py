@@ -88,7 +88,7 @@ def test_data_cleaner():
         print("-" * 80)
 
     # 保存结果
-    output_file = "str(Path(__file__).resolve().parent / 'output_cleaner.json')"
+    output_file = str(Path(__file__).resolve().parent / "output_cleaner.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {

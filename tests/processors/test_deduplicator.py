@@ -101,7 +101,7 @@ def test_deduplicator():
         print("-" * 80)
 
     # 保存结果
-    output_file = "str(Path(__file__).resolve().parent / 'output_deduplicator.json')"
+    output_file = str(Path(__file__).resolve().parent / "output_deduplicator.json")
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(
             {
