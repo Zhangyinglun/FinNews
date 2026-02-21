@@ -3,14 +3,14 @@ import os
 import base64
 from pathlib import Path
 
-# 添加项目根目录到路径
-sys.path.insert(0, str(Path(__file__).parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from utils.comex_chart import ComexChartGenerator
 
 
 def debug_chart():
-    history_file = Path("D:/Projects/FinNews/outputs/comex_history.json")
+    history_file = PROJECT_ROOT / "outputs" / "comex_history.json"
     if not history_file.exists():
         print(f"❌ 历史文件不存在: {history_file}")
         return
@@ -59,7 +59,7 @@ def debug_chart():
     </html>
     """
 
-    output_path = Path("D:/Projects/FinNews/tests/debug_chart.html")
+    output_path = PROJECT_ROOT / "tests" / "debug_chart.html"
     output_path.write_text(html_content, encoding="utf-8")
     print(f"✅ 测试 HTML 已生成: {output_path}")
     print("请在浏览器中打开此文件查看图片是否正常显示。")

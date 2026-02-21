@@ -427,7 +427,7 @@ jobs:
 
 1. 在相应目录创建 `test_*.py` 文件
 2. 遵循现有测试格式
-3. 添加 `sys.path.insert(0, "D:\\Projects\\FinNews")` 头部
+3. 添加动态路径头部 (参考下方模板)
 4. 实现独立可执行的测试函数
 5. 更新 `run_tests.py` 中的 `TEST_MODULES` 字典
 
@@ -439,8 +439,10 @@ jobs:
 """
 
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "D:\\Projects\\FinNews")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from [module] import [Class]
 from utils.logger import setup_logger

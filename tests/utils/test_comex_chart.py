@@ -3,11 +3,12 @@ COMEX 图表生成器单元测试
 """
 
 import sys
+from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import unittest
-from pathlib import Path
 from utils.comex_chart import ComexChartGenerator
 
 
@@ -16,8 +17,7 @@ class TestComexChartGenerator(unittest.TestCase):
 
     def setUp(self):
         """初始化测试"""
-        # 使用真实的历史文件路径
-        self.history_file = Path("D:/Projects/FinNews/outputs/comex_history.json")
+        self.history_file = PROJECT_ROOT / "outputs" / "comex_history.json"
         self.generator = ComexChartGenerator(self.history_file)
 
     def test_generate_silver_chart(self):
@@ -47,8 +47,7 @@ class TestComexChartGenerator(unittest.TestCase):
 
     def test_empty_history(self):
         """测试历史数据为空时的处理"""
-        # 使用不存在的文件
-        fake_file = Path("D:/Projects/FinNews/outputs/fake_history.json")
+        fake_file = PROJECT_ROOT / "outputs" / "fake_history.json"
         gen = ComexChartGenerator(fake_file)
 
         chart = gen.generate_chart("silver", days=14)

@@ -76,6 +76,8 @@ nul
 tests/scrapers/output_*.json
 tests/processors/output_*.json
 tests/storage/test_results.json
+tests/debug_*.html
+outputs/*_test.html
 
 # OpenCode IDE
 .opencode/
