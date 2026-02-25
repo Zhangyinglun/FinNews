@@ -19,8 +19,7 @@ def test_price_table_always_renders_rows():
     data = MultiWindowData()
     digest_data = {
         "subject": "测试邮件",
-        "key_news": [],
-        "other_news": [],
+        "news_clusters": [],
         "analysis": {},
     }
 
