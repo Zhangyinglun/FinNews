@@ -152,13 +152,15 @@ def test_openrouter_digest():
 
 你的任务:
 1. 生成邮件标题 (subject)
-2. 从新闻中筛选5-8条最重要的作为重点新闻 (key_news)
-3. 将其他相关新闻放入其他新闻 (other_news)
-4. 撰写市场分析 (analysis)
+2. 将所有新闻按事件/主题进行语义聚合，生成新闻综述组 (news_clusters)
+   - 报道同一事件的不同角度新闻合并到同一个 cluster
+   - 独立新闻单独成组
+   - cluster 按重要性排序，每个 cluster 内 sources 也按重要性排序
+3. 撰写市场分析 (analysis)
 
 重要规则:
 - 所有英文新闻标题和摘要必须翻译成中文
-- 新闻只陈述事实，不要添加任何分析性语言
+- 新闻综述只陈述事实，不要添加任何分析性语言
 - 所有分析、判断、建议必须放在analysis字段
 - 使用中文，专业但易懂
 - 严格按照JSON Schema返回结果"""
@@ -181,13 +183,20 @@ def test_openrouter_digest():
 
     assert isinstance(data.get("subject"), str) and data["subject"].strip()
 
-    for list_name in ("key_news", "other_news"):
-        items = data.get(list_name)
-        assert isinstance(items, list)
-        for item in items:
-            assert isinstance(item.get("title"), str) and item["title"].strip()
-            assert isinstance(item.get("source"), str) and item["source"].strip()
-            assert isinstance(item.get("summary"), str)
+    clusters = data.get("news_clusters")
+    assert isinstance(clusters, list)
+    for cluster in clusters:
+        assert isinstance(cluster.get("cluster_title"), str)
+        assert isinstance(cluster.get("cluster_summary"), str)
+        assert cluster.get("impact_tag") in {"Bullish", "Bearish", "Neutral"}
+
+        sources = cluster.get("sources")
+        assert isinstance(sources, list)
+        for source_item in sources:
+            assert isinstance(source_item.get("title"), str)
+            assert isinstance(source_item.get("source"), str)
+            assert isinstance(source_item.get("url"), str)
+            assert isinstance(source_item.get("timestamp"), str)
 
     analysis = data.get("analysis")
     assert isinstance(analysis, dict)

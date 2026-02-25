@@ -535,15 +535,18 @@ def main():
 
 你的任务:
 1. 生成邮件标题 (subject)
-2. 从新闻中筛选恰好5条最重要的作为重点新闻 (key_news) - 注意是恰好5条，不多不少
-3. 筛选最多5条其他值得关注的新闻 (other_news)，低相关性的直接丢弃
-4. 撰写精简的市场分析 (analysis) — 每项30-60字，用要点式
+2. 将所有新闻按事件/主题进行语义聚合，生成新闻综述组 (news_clusters)
+   - 报道同一事件的不同角度新闻合并到同一个 cluster
+   - 独立新闻单独成组
+   - cluster 按重要性排序，每个 cluster 内 sources 也按重要性排序
+3. 撰写精简的市场分析 (analysis) — 每项30-60字，用要点式
 
 重要规则:
 - 所有英文新闻标题和摘要必须翻译成中文
-- 新闻只陈述事实，不要添加任何分析性语言
+- 新闻综述只陈述事实，不要添加任何分析性语言
 - 所有分析、判断、建议必须放在analysis字段
-- 每条新闻必须包含6个字段: title, source, summary, url, impact_tag, timestamp
+- 每个 cluster 包含: cluster_title, cluster_summary, impact_tag, sources[]
+- 每个 source 包含: title, source, url, timestamp
 - url和timestamp若原始数据中无，则填空字符串
 - 使用中文，专业但易懂
 - 严格按照JSON Schema返回结果"""
@@ -575,8 +578,7 @@ def main():
                     digest_data = json.loads(content)
                     logger.debug(
                         f"LLM返回数据: subject={digest_data.get('subject', 'N/A')[:50]}, "
-                        f"key_news={len(digest_data.get('key_news', []))}, "
-                        f"other_news={len(digest_data.get('other_news', []))}"
+                        f"news_clusters={len(digest_data.get('news_clusters', []))}"
                     )
                 except json.JSONDecodeError as e:
                     logger.error(f"LLM响应JSON解析失败: {e}")

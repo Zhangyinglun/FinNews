@@ -10,7 +10,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from models.market_data import MultiWindowData
@@ -46,6 +47,84 @@ class DigestController:
     def __init__(self):
         """初始化控制器"""
         pass
+
+    def _normalize_title(self, title: str) -> List[str]:
+        """标题归一化：小写化 + 分词 + 轻量词形还原。"""
+        text = title.lower().strip()
+        tokens = re.findall(r"[a-z]+|[\u4e00-\u9fff]", text)
+
+        normalized: List[str] = []
+        for token in tokens:
+            if token.endswith("ing") and len(token) > 4:
+                token = token[:-3]
+            elif token.endswith("ies") and len(token) > 4:
+                token = token[:-3] + "y"
+            elif token.endswith("es") and len(token) > 3:
+                token = token[:-2]
+            elif token.endswith("s") and len(token) > 3:
+                token = token[:-1]
+            normalized.append(token)
+
+        return normalized
+
+    def _pre_deduplicate_news(self, news_list: List[Any]) -> List[Any]:
+        """
+        传给 LLM 前执行轻量标题去重。
+
+        仅剔除高度重复标题，不做语义聚合。
+        """
+        if not news_list:
+            return []
+
+        threshold = 0.75
+        kept: List[Any] = []
+        kept_tokens: List[set[str]] = []
+
+        for news in news_list:
+            title = getattr(news, "title", "")
+            tokens = set(self._normalize_title(title))
+
+            is_duplicate = False
+            for idx, existing_tokens in enumerate(kept_tokens):
+                if not tokens or not existing_tokens:
+                    continue
+
+                intersection = tokens & existing_tokens
+                union = tokens | existing_tokens
+                jaccard = len(intersection) / len(union) if union else 0.0
+
+                if jaccard >= threshold:
+                    existing = kept[idx]
+                    existing_score = getattr(existing, "relevance_score", None) or 0.0
+                    new_score = getattr(news, "relevance_score", None) or 0.0
+
+                    if new_score > existing_score:
+                        kept[idx] = news
+                        kept_tokens[idx] = tokens
+                    elif (
+                        new_score == existing_score
+                        and getattr(news, "timestamp", None)
+                        and getattr(existing, "timestamp", None)
+                        and self._safe_timestamp(news.timestamp)
+                        > self._safe_timestamp(existing.timestamp)
+                    ):
+                        kept[idx] = news
+                        kept_tokens[idx] = tokens
+
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                kept.append(news)
+                kept_tokens.append(tokens)
+
+        return kept
+
+    def _safe_timestamp(self, dt: datetime) -> float:
+        """将 datetime 安全转换为时间戳，兼容 naive/aware。"""
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc).timestamp()
+        return dt.timestamp()
 
     def _get_vix_indicator(self, signal: MarketSignal) -> Tuple[str, str, str]:
         """
@@ -142,15 +221,19 @@ class DigestController:
         lines.append("")
 
         # === 新闻数据 ===
+        flash_news = self._pre_deduplicate_news(data.flash.news[:15])
+        cycle_news = self._pre_deduplicate_news(data.cycle.news[:10])
+        trend_news = self._pre_deduplicate_news(data.trend.news[:8])
+
         lines.append("=" * 60)
-        lines.append("【新闻数据 - 请从中筛选重点新闻和其他新闻】")
+        lines.append("【新闻数据 - 请从中聚合同一事件并生成综述】")
         lines.append("=" * 60)
         lines.append("")
 
         # Flash窗口新闻
         lines.append("## Flash窗口新闻 (12小时内)")
-        if data.flash.news:
-            for i, news in enumerate(data.flash.news[:15], 1):
+        if flash_news:
+            for i, news in enumerate(flash_news, 1):
                 # 附加元数据辅助LLM排序
                 impact = f" [影响:{news.impact_tag}]" if news.impact_tag else ""
                 relevance = (
@@ -182,8 +265,8 @@ class DigestController:
 
         # Cycle窗口新闻
         lines.append("## Cycle窗口新闻 (7天内)")
-        if data.cycle.news:
-            for i, news in enumerate(data.cycle.news[:10], 1):
+        if cycle_news:
+            for i, news in enumerate(cycle_news, 1):
                 impact = f" [影响:{news.impact_tag}]" if news.impact_tag else ""
                 relevance = (
                     f" [相关性:{news.relevance_score:.2f}]"
@@ -214,8 +297,8 @@ class DigestController:
 
         # Trend窗口新闻
         lines.append("## Trend窗口新闻 (30天内)")
-        if data.trend.news:
-            for i, news in enumerate(data.trend.news[:8], 1):
+        if trend_news:
+            for i, news in enumerate(trend_news, 1):
                 impact = f" [影响:{news.impact_tag}]" if news.impact_tag else ""
                 relevance = (
                     f" [相关性:{news.relevance_score:.2f}]"
@@ -254,26 +337,30 @@ class DigestController:
         lines.append("   - 要求: 不要在标题中固定使用VIX警报词或符号")
         lines.append("   - 例如: 2026-01-20 市场日报：美联储表态偏鹰，金价高位震荡")
         lines.append("")
-        lines.append("2. 筛选重点新闻 (key_news)")
-        lines.append("   - 恰好选择5条最重要的新闻（不多不少）")
-        lines.append("   - 优先级排序规则:")
+        lines.append("2. 新闻综述聚合 (news_clusters)")
+        lines.append("   - 将所有新闻按事件/主题进行语义聚合")
+        lines.append("   - 报道同一事件的不同角度新闻合并到同一个 cluster")
+        lines.append("   - 独立新闻（无相关新闻）单独成为一个 cluster")
+        lines.append("   - cluster 之间按重要性排序（最重要的事件排第一）")
+        lines.append("   - 每个 cluster 内的 sources 也按重要性排序")
+        lines.append("   - 重要性排序规则:")
         lines.append("     1) 影响标签: Bullish/Bearish > Neutral")
         lines.append("     2) 相关性评分: 越高越优先")
         lines.append("     3) 时效性: 越新越优先")
-        lines.append("   - 只陈述事实，不要添加分析")
+        lines.append("   - 每个 cluster 必须包含:")
+        lines.append("     * cluster_title: 综述标题（中文），概括该组新闻核心事件")
+        lines.append("     * cluster_summary: 整合摘要（中文，1-3句话）")
         lines.append(
-            "   - 每条必须包含: title, source, summary, url, impact_tag, timestamp"
+            "     * impact_tag: 对贵金属整体影响方向 (Bullish/Bearish/Neutral)"
         )
-        lines.append("   - url和timestamp若原始数据中无，则填空字符串")
-        lines.append("")
-        lines.append("3. 筛选其他新闻 (other_news)")
-        lines.append("   - 最多5条值得关注的其他新闻，低相关性的直接丢弃")
-        lines.append("   - 只陈述事实，不要添加分析")
         lines.append(
-            "   - 每条必须包含: title, source, summary, url, impact_tag, timestamp"
+            "     * sources: 原始新闻列表，每条含 title, source, url, timestamp"
         )
+        lines.append("   - 综述标题和摘要应整合多条新闻信息，不要复制单条新闻")
+        lines.append("   - 所有英文标题和摘要必须翻译成中文")
+        lines.append("   - 新闻综述只陈述事实，不添加分析判断")
         lines.append("")
-        lines.append("4. 撰写精简的市场分析 (analysis)")
+        lines.append("3. 撰写精简的市场分析 (analysis)")
         lines.append("   - market_sentiment: 当前市场情绪判断 (基于VIX和宏观数据)")
         lines.append("   - price_outlook: 黄金白银短期走势预判")
         lines.append("   - risk_factors: 需要关注的风险点")
@@ -444,11 +531,10 @@ class DigestController:
         else:
             econ_section_html = ""  # 无数据时隐藏整个板块
 
-        # 构建重点新闻
-        key_news_html = self._render_news_list(digest_data.get("key_news", []))
-
-        # 构建其他新闻
-        other_news_html = self._render_news_list(digest_data.get("other_news", []))
+        # 构建新闻综述组
+        news_clusters_html = self._render_news_clusters(
+            digest_data.get("news_clusters", [])
+        )
 
         # 构建市场分析
         analysis = digest_data.get("analysis", {})
@@ -513,33 +599,30 @@ class DigestController:
             price_table=price_table_html,
             econ_section=econ_section_html,
             comex_section=comex_section_html,
-            key_news=key_news_html,
-            other_news=other_news_html,
+            news_clusters=news_clusters_html,
             analysis=analysis_html,
         )
 
         return html, images
 
-    def _render_news_list(self, news_list: List[Dict[str, str]]) -> str:
-        """渲染新闻列表HTML (内联样式，Gmail兼容)"""
-        if not news_list:
+    def _render_news_clusters(self, clusters: List[Dict[str, Any]]) -> str:
+        """渲染新闻综述组 HTML (内联样式，Gmail兼容)。"""
+        if not clusters:
             return '<div style="padding: 14px 0; color: #64748b; font-size: 14px;">暂无相关新闻</div>'
 
         items = []
-        for i, news in enumerate(news_list):
-            title = news.get("title", "无标题")
-            source = news.get("source", "未知来源")
-            summary = news.get("summary", "")
-            url = news.get("url", "")
-            impact_tag = news.get("impact_tag", "Neutral")
-            timestamp = news.get("timestamp", "")
+        for i, cluster in enumerate(clusters):
+            cluster_title = cluster.get("cluster_title", "无标题")
+            cluster_summary = cluster.get("cluster_summary", "")
+            impact_tag = cluster.get("impact_tag", "Neutral")
+            sources = cluster.get("sources", [])
 
-            # 最后一条不加底部边框
             border_style = (
-                "border-bottom: 1px solid #f0f0f0;" if i < len(news_list) - 1 else ""
+                "border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; padding-bottom: 16px;"
+                if i < len(clusters) - 1
+                else ""
             )
 
-            # impact_tag 彩色标签（中文显示）
             impact_tag_map = {
                 "Bullish": ("利多", "#166534", "#dcfce7"),
                 "Bearish": ("利空", "#991b1b", "#fee2e2"),
@@ -548,25 +631,66 @@ class DigestController:
             tag_text, tag_color, tag_bg = impact_tag_map.get(
                 impact_tag, ("中性", "#6c757d", "#e9ecef")
             )
-            impact_tag_html = f'<span style="display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; color: {tag_color}; background-color: {tag_bg}; margin-right: 8px; vertical-align: middle;">{tag_text}</span>'
-
-            # 标题链接
-            if url:
-                title_html = f'<a href="{url}" style="font-size: 16px; font-weight: 600; color: #0f172a; text-decoration: none; line-height: 1.5;" target="_blank">{title}</a>'
-            else:
-                title_html = f'<span style="font-size: 16px; font-weight: 600; color: #0f172a; line-height: 1.5;">{title}</span>'
-
-            # 时间戳显示
-            timestamp_html = (
-                f'<span style="color: #94a3b8;"> · {timestamp}</span>'
-                if timestamp
-                else ""
+            impact_tag_html = (
+                '<span style="display: inline-block; padding: 2px 8px; '
+                "border-radius: 12px; font-size: 12px; font-weight: 600; "
+                f"color: {tag_color}; background-color: {tag_bg}; "
+                f'margin-right: 8px; vertical-align: middle;">{tag_text}</span>'
             )
 
+            cluster_title_html = (
+                f'<span style="font-size: 16px; font-weight: 600; '
+                f'color: #0f172a; line-height: 1.5;">{cluster_title}</span>'
+            )
+
+            summary_html = ""
+            if cluster_summary:
+                summary_html = (
+                    '<div style="font-size: 14px; color: #334155; '
+                    f'line-height: 1.7; margin: 8px 0 10px 0;">{cluster_summary}</div>'
+                )
+
+            source_items = []
+            for source_item in sources:
+                source_title = source_item.get("title", "")
+                source_name = source_item.get("source", "")
+                source_url = source_item.get("url", "")
+                source_time = source_item.get("timestamp", "")
+
+                meta_parts = [part for part in [source_name, source_time] if part]
+                meta_str = " · ".join(meta_parts)
+
+                if source_url:
+                    source_title_html = (
+                        f'<a href="{source_url}" style="color: #2563eb; '
+                        f'text-decoration: none; font-size: 13px;" '
+                        f'target="_blank">{source_title}</a>'
+                    )
+                else:
+                    source_title_html = (
+                        f'<span style="color: #475569; font-size: 13px;">'
+                        f"{source_title}</span>"
+                    )
+
+                source_meta_html = ""
+                if meta_str:
+                    source_meta_html = (
+                        '<span style="color: #94a3b8; font-size: 12px; '
+                        f'margin-left: 6px;">({meta_str})</span>'
+                    )
+
+                source_items.append(
+                    '<div style="padding: 3px 0 3px 12px;">'
+                    '<span style="color: #94a3b8; margin-right: 6px;">·</span>'
+                    f"{source_title_html}{source_meta_html}</div>"
+                )
+
+            sources_html = "\n".join(source_items)
+
             item_html = f"""<div style="padding: 14px 0; {border_style}">
-                <div style="margin-bottom: 8px;">{impact_tag_html}{title_html}</div>
-                <div style="font-size: 13px; color: #64748b; margin-bottom: 7px;">来源: {source}{timestamp_html}</div>
-                {f'<div style="font-size: 14px; color: #334155; line-height: 1.7;">{summary}</div>' if summary else ""}
+                <div style="margin-bottom: 8px;">{impact_tag_html}{cluster_title_html}</div>
+                {summary_html}
+                {sources_html}
             </div>"""
             items.append(item_html)
 
@@ -869,80 +993,59 @@ DIGEST_JSON_SCHEMA: Dict[str, Any] = {
                 "type": "string",
                 "description": "邮件标题，格式: YYYY-MM-DD 市场日报：[今日核心内容]",
             },
-            "key_news": {
+            "news_clusters": {
                 "type": "array",
-                "description": "恰好5条重点新闻，只陈述事实",
-                "minItems": 5,
-                "maxItems": 5,
+                "description": "新闻综述组，按事件/主题聚合并按重要性排序",
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "title": {"type": "string", "description": "新闻标题（中文）"},
-                        "source": {"type": "string", "description": "新闻来源"},
-                        "summary": {
+                        "cluster_title": {
                             "type": "string",
-                            "description": "新闻摘要（中文）",
+                            "description": "综述标题（中文）",
                         },
-                        "url": {
+                        "cluster_summary": {
                             "type": "string",
-                            "description": "新闻原文链接，无链接时返回空字符串",
+                            "description": "整合摘要（中文，1-3句话）",
                         },
                         "impact_tag": {
                             "type": "string",
                             "enum": ["Bullish", "Bearish", "Neutral"],
-                            "description": "对黄金白银的影响方向",
+                            "description": "对贵金属整体影响方向",
                         },
-                        "timestamp": {
-                            "type": "string",
-                            "description": "新闻发布时间，格式 HH:MM，未知时返回空字符串",
-                        },
-                    },
-                    "required": [
-                        "title",
-                        "source",
-                        "summary",
-                        "url",
-                        "impact_tag",
-                        "timestamp",
-                    ],
-                },
-            },
-            "other_news": {
-                "type": "array",
-                "description": "其他新闻（最多5条），只陈述事实",
-                "maxItems": 5,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "title": {"type": "string", "description": "新闻标题（中文）"},
-                        "source": {"type": "string", "description": "新闻来源"},
-                        "summary": {
-                            "type": "string",
-                            "description": "新闻摘要（中文）",
-                        },
-                        "url": {
-                            "type": "string",
-                            "description": "新闻原文链接，无链接时返回空字符串",
-                        },
-                        "impact_tag": {
-                            "type": "string",
-                            "enum": ["Bullish", "Bearish", "Neutral"],
-                            "description": "对黄金白银的影响方向",
-                        },
-                        "timestamp": {
-                            "type": "string",
-                            "description": "新闻发布时间，格式 HH:MM，未知时返回空字符串",
+                        "sources": {
+                            "type": "array",
+                            "description": "原始新闻列表（按重要性排序）",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "description": "原始新闻标题（中文）",
+                                    },
+                                    "source": {
+                                        "type": "string",
+                                        "description": "新闻来源",
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "description": "新闻原文链接，无链接时返回空字符串",
+                                    },
+                                    "timestamp": {
+                                        "type": "string",
+                                        "description": "发布时间，格式 HH:MM，未知时返回空字符串",
+                                    },
+                                },
+                                "required": ["title", "source", "url", "timestamp"],
+                            },
                         },
                     },
                     "required": [
-                        "title",
-                        "source",
-                        "summary",
-                        "url",
+                        "cluster_title",
+                        "cluster_summary",
                         "impact_tag",
-                        "timestamp",
+                        "sources",
                     ],
                 },
             },
@@ -976,7 +1079,7 @@ DIGEST_JSON_SCHEMA: Dict[str, Any] = {
                 ],
             },
         },
-        "required": ["subject", "key_news", "other_news", "analysis"],
+        "required": ["subject", "news_clusters", "analysis"],
     },
 }
 
@@ -1032,31 +1135,16 @@ EMAIL_TEMPLATE = """<!DOCTYPE html>
                     <!-- Section 1.6: COMEX Inventory (dynamically inserted) -->
                     {comex_section}
 
-                    <!-- Section 2: Key News -->
+                    <!-- Section 2: News Clusters -->
                     <tr>
                         <td style="padding: 0 16px 20px 16px;">
                             <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
                                 <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
                                     <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
-                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">重点新闻</span>
+                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">新闻综述</span>
                                 </div>
                                 <div style="padding: 10px 16px;">
-                                    {key_news}
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-
-                    <!-- Section 3: Other News -->
-                    <tr>
-                        <td style="padding: 0 16px 20px 16px;">
-                            <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background-color: #ffffff;">
-                                <div style="background-color: #1e293b; padding: 11px 14px; border-bottom: 1px solid #334155;">
-                                    <span style="display: inline-block; width: 3px; height: 18px; background-color: #ca8a04; margin-right: 8px; vertical-align: middle;"></span>
-                                    <span style="font-size: 17px; font-weight: 600; color: #f8fafc; vertical-align: middle;">其他新闻</span>
-                                </div>
-                                <div style="padding: 10px 16px;">
-                                    {other_news}
+                                    {news_clusters}
                                 </div>
                             </div>
                         </td>
