@@ -2,13 +2,10 @@
 集成测试：验证 main.py 中的价格补全 (Failover) 逻辑
 """
 
-from pathlib import Path
-import sys
+import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
 from datetime import datetime
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from pathlib import Path
 
 from scrapers import YFinanceScraper, StooqScraper
 from utils.price_cache_manager import PriceCacheManager
@@ -17,14 +14,12 @@ from config.config import Config
 
 class TestMainFailoverLogic(unittest.TestCase):
     def setUp(self):
-        self.cache_file = Config.STORAGE_DIR / "integration_test_cache.json"
-        if self.cache_file.exists():
-            self.cache_file.unlink()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.cache_file = Path(self._tmpdir.name) / "integration_test_cache.json"
         self.cache_manager = PriceCacheManager(cache_file=self.cache_file)
 
     def tearDown(self):
-        if self.cache_file.exists():
-            self.cache_file.unlink()
+        self._tmpdir.cleanup()
 
     def test_failover_flow(self):
         # 模拟初始数据：全部缺失
@@ -95,9 +90,3 @@ class TestMainFailoverLogic(unittest.TestCase):
         vix_record = next(r for r in all_data if r.get("ticker_name") == "vix")
         self.assertTrue(vix_record.get("is_fallback"))
         self.assertEqual(vix_record.get("source"), "YFinance (Cache)")
-
-        print("✅ main.py Failover 逻辑模拟测试通过")
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -1,62 +1,66 @@
 """
-测试 FRED 数据源
+测试 FRED 数据源（mock 版）
 """
 
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import pytest
+import pandas as pd
 
 from scrapers.fred_scraper import FREDScraper
-from utils.logger import setup_logger
-import json
 
 
-def test_fred_scraper():
-    """测试 FRED Scraper 数据抓取"""
-    # 初始化
-    setup_logger()
+@pytest.fixture
+def mock_fred(mocker, monkeypatch):
+    """mock fredapi.Fred"""
+    monkeypatch.setenv("FRED_API_KEY", "dummy_key")
+
+    def fake_get_series(series_id, **kwargs):
+        data = {
+            "CPIAUCSL": [310.0, 311.5],
+            "PCEPILFE": [170.0, 170.5],
+            "PAYEMS": [158000, 158200],
+            "UNRATE": [4.1, 4.0],
+            "FEDFUNDS": [5.25, 5.25],
+            "GDP": [28000, 28500],
+            "M1SL": [18000, 18100],
+            "M2SL": [21000, 21100],
+        }
+        values = data.get(series_id, [1.0, 1.1])
+        return pd.Series(
+            values,
+            index=pd.to_datetime(["2026-01-01", "2026-02-01"]),
+        )
+
+    mock_f = mocker.MagicMock()
+    mock_f.get_series.side_effect = fake_get_series
+    mocker.patch("fredapi.Fred", return_value=mock_f)
+    return mock_f
+
+
+def test_fred_scraper_returns_data(mock_fred):
+    """FREDScraper.fetch() 应返回非空数据"""
     scraper = FREDScraper()
-
-    # 抓取数据
-    print("=" * 80)
-    print("正在抓取 FRED 经济数据...")
-    print("=" * 80)
-
     data = scraper.run()
 
-    print(f"\n✅ 抓取完成！共获取 {len(data)} 条经济指标\n")
-
-    # 显示详细数据
-    print("📊 经济指标详情:")
-    for idx, item in enumerate(data, 1):
-        print(f"\n【指标 {idx}】")
-        print(f"名称: {item.get('indicator', 'N/A')}")
-        print(f"代码: {item.get('series_id', 'N/A')}")
-        print(f"最新值: {item.get('value', 'N/A')}")
-
-        change = item.get("change")
-        change_pct = item.get("change_pct")
-        if change is not None and change_pct is not None:
-            direction = "📈" if change > 0 else "📉" if change < 0 else "➡️"
-            print(f"变化: {direction} {change:+.4f} ({change_pct:+.2f}%)")
-
-        print(f"数据日期: {item.get('timestamp', 'N/A')}")
-        print(f"抓取时间: {item.get('fetched_at', 'N/A')}")
-        print("-" * 80)
-
-    # 保存为 JSON 方便查看
-    output_file = str(Path(__file__).resolve().parent / "output_fred.json")
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-
-    print(f"\n💾 详细数据已保存到: {output_file}")
-
-    # 断言基本验证
-    assert len(data) > 0, "应该获取到至少一条数据"
-    assert "indicator" in data[0], "记录应该包含indicator字段"
-    assert "value" in data[0], "记录应该包含value字段"
+    assert isinstance(data, list)
+    assert len(data) > 0
 
 
-if __name__ == "__main__":
-    test_fred_scraper()
+def test_fred_record_has_required_fields(mock_fred):
+    """每条记录应包含 indicator 和 value"""
+    scraper = FREDScraper()
+    data = scraper.run()
+
+    assert len(data) > 0
+    first = data[0]
+    assert "indicator" in first, "记录应该包含indicator字段"
+    assert "value" in first, "记录应该包含value字段"
+    assert "source" in first, "记录应该包含source字段"
+
+
+def test_fred_record_type(mock_fred):
+    """记录类型应为 economic_data"""
+    scraper = FREDScraper()
+    data = scraper.run()
+
+    for record in data:
+        assert record.get("type") == "economic_data", "所有记录应为 economic_data 类型"

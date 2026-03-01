@@ -1,64 +1,63 @@
 """
-测试 Alpha Vantage 数据源
+测试 Alpha Vantage 数据源（mock 版）
 """
 
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import pytest
+import pandas as pd
 
 from scrapers.alpha_vantage_scraper import AlphaVantageScraper
-from utils.logger import setup_logger
-import json
 
 
-def test_alpha_vantage_scraper():
-    """测试 Alpha Vantage Scraper 数据抓取"""
-    # 初始化
-    setup_logger()
+@pytest.fixture
+def mock_alpha_vantage(mocker, monkeypatch):
+    """mock alpha_vantage ForeignExchange"""
+    monkeypatch.setenv("ALPHA_VANTAGE_API_KEY", "dummy_key")
 
-    try:
-        scraper = AlphaVantageScraper()
-    except (ImportError, ValueError) as e:
-        print(f"⚠️ Alpha Vantage 不可用: {e}")
-        print("跳过测试")
-        return
+    fx_data = pd.DataFrame(
+        {
+            "4. close": [0.9215],
+            "1. open": [0.9200],
+            "2. high": [0.9230],
+            "3. low": [0.9190],
+        },
+        index=pd.to_datetime(["2026-03-01"]),
+    )
+    fx_data.index.name = "date"
 
-    # 抓取数据
-    print("=" * 80)
-    print("正在抓取 Alpha Vantage 数据...")
-    print("=" * 80)
+    mock_fx = mocker.MagicMock()
+    mock_fx.get_currency_exchange_daily.return_value = (fx_data, {})
 
+    mock_ts = mocker.MagicMock()
+
+    mocker.patch("scrapers.alpha_vantage_scraper.ForeignExchange", return_value=mock_fx)
+    mocker.patch("scrapers.alpha_vantage_scraper.TimeSeries", return_value=mock_ts)
+    return mock_fx
+
+
+def test_alpha_vantage_scraper_returns_data(mock_alpha_vantage):
+    """AlphaVantageScraper.fetch() 应返回数据"""
+    scraper = AlphaVantageScraper()
     data = scraper.run()
 
-    print(f"\n✅ 抓取完成！共获取 {len(data)} 条记录\n")
-
-    # 显示详细数据
-    if data:
-        print("📊 数据详情:")
-        for idx, item in enumerate(data, 1):
-            print(f"\n【记录 {idx}】")
-            print(f"货币对: {item.get('pair', 'N/A')}")
-            print(f"收盘价: {item.get('close', 'N/A')}")
-            print(f"数据类型: {item.get('type', 'N/A')}")
-            print(f"数据时间: {item.get('timestamp', 'N/A')}")
-            print(f"抓取时间: {item.get('fetched_at', 'N/A')}")
-            print("-" * 80)
-
-        # 保存为 JSON 方便查看
-        output_file = str(Path(__file__).resolve().parent / "output_alpha_vantage.json")
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-
-        print(f"\n💾 详细数据已保存到: {output_file}")
-
-        # 断言基本验证
-        assert len(data) > 0, "应该获取到至少一条数据"
-        assert "pair" in data[0], "记录应该包含pair字段"
-        assert "type" in data[0], "记录应该包含type字段"
-    else:
-        print("⚠️ 未获取到数据（可能是API配额已用完）")
+    assert isinstance(data, list)
+    assert len(data) > 0
 
 
-if __name__ == "__main__":
-    test_alpha_vantage_scraper()
+def test_alpha_vantage_record_fields(mock_alpha_vantage):
+    """记录应包含 pair 和 type 字段"""
+    scraper = AlphaVantageScraper()
+    data = scraper.run()
+
+    assert len(data) > 0
+    first = data[0]
+    assert "pair" in first, "记录应该包含pair字段"
+    assert "type" in first, "记录应该包含type字段"
+
+
+def test_alpha_vantage_record_type(mock_alpha_vantage):
+    """记录类型应为 fx_data"""
+    scraper = AlphaVantageScraper()
+    data = scraper.run()
+
+    for record in data:
+        assert record.get("type") == "fx_data", "所有记录应为 fx_data 类型"

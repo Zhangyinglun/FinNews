@@ -57,3 +57,9 @@ curl-cffi==0.7.3              # Session复用优化
 # transformers==4.48.0        # FinBERT情感分析
 # vaderSentiment==3.3.2       # VADER情感分析
 # streamlit==1.40.2           # 可视化仪表板
+
+# ========================================
+# Testing
+# ========================================
+pytest>=8.0.0
+pytest-mock>=3.12.0

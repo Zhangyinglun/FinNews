@@ -2,11 +2,6 @@
 测试价格表在数据缺失时仍显示内容
 """
 
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
 from models.analysis import MarketSignal
 from models.market_data import MultiWindowData
 from utils.digest_controller import DigestController
@@ -34,7 +29,3 @@ def test_price_table_always_renders_rows():
         "10年期国债",
     ]:
         assert label in html
-
-
-if __name__ == "__main__":
-    test_price_table_always_renders_rows()

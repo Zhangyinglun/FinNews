@@ -2,12 +2,9 @@
 测试 SonarClient 提示词、响应解析与异常日志
 """
 
-import sys
 from unittest.mock import Mock
 
 import requests
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from utils import sonar_client
 from utils.sonar_client import SonarClient
@@ -97,11 +94,3 @@ def test_search_logs_request_exception_with_stack():
     client.logger.warning.assert_called_once()
     _, kwargs = client.logger.warning.call_args
     assert kwargs.get("exc_info") is True
-
-
-if __name__ == "__main__":
-    test_build_payload_contains_citations_requirement()
-    test_parse_response_citations_from_strings()
-    test_parse_response_citations_from_dicts()
-    test_parse_response_logs_exception_with_stack()
-    test_search_logs_request_exception_with_stack()

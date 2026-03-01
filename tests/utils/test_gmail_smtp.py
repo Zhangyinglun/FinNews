@@ -1,64 +1,76 @@
-"""Standalone test: Gmail SMTP HTML send.
-
-Prereqs in .env:
-- SMTP_USERNAME
-- SMTP_PASSWORD (Google App Password)
-- EMAIL_FROM
-- EMAIL_TO (comma-separated)
-
-Run:
-  python -m tests.utils.test_gmail_smtp
+"""
+测试 Gmail SMTP 发送功能（mock 版）
 """
 
-from pathlib import Path
-import sys
+import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
-from config.config import Config
 from utils.mailer import GmailSmtpMailer
 
 
-def test_gmail_smtp():
-    """测试 Gmail SMTP 发送功能"""
-    if not Config.SMTP_USERNAME or not Config.SMTP_PASSWORD:
-        raise SystemExit("Missing SMTP_USERNAME/SMTP_PASSWORD")
-    if not Config.EMAIL_FROM:
-        raise SystemExit("Missing EMAIL_FROM")
+@pytest.fixture
+def mock_smtp(mocker):
+    """mock smtplib.SMTP，避免真实网络连接"""
+    mock_server = mocker.MagicMock()
+    mock_server.__enter__ = mocker.MagicMock(return_value=mock_server)
+    mock_server.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("utils.mailer.smtplib.SMTP", return_value=mock_server)
+    return mock_server
 
-    to_list = [e.strip() for e in Config.EMAIL_TO.split(",") if e.strip()]
-    if not to_list:
-        raise SystemExit("Missing EMAIL_TO")
 
-    mailer = GmailSmtpMailer(
-        host=Config.SMTP_HOST,
-        port=Config.SMTP_PORT,
-        username=Config.SMTP_USERNAME,
-        password=Config.SMTP_PASSWORD,
-        use_tls=Config.SMTP_USE_TLS,
+@pytest.fixture
+def mailer():
+    return GmailSmtpMailer(
+        host="smtp.gmail.com",
+        port=587,
+        username="test@gmail.com",
+        password="test_password",
+        use_tls=True,
     )
 
-    html_body = """
-    <html>
-      <body>
-        <h2>FinNews SMTP Test</h2>
-        <p>This is a test HTML email from FinNews.</p>
-        <p>If you received this, the SMTP configuration is working correctly.</p>
-      </body>
-    </html>
-    """.strip()
 
+def test_send_html_calls_smtp(mock_smtp, mailer):
+    """send_html 应建立 SMTP 连接并发送邮件"""
     mailer.send_html(
-        subject="FinNews SMTP Test",
-        html_body=html_body,
-        email_from=Config.EMAIL_FROM,
-        to_list=to_list,
+        subject="FinNews Test",
+        html_body="<html><body><p>Test email</p></body></html>",
+        email_from="test@gmail.com",
+        to_list=["recipient@example.com"],
     )
 
-    print(f"OK: sent to {len(to_list)} recipients")
-    for email in to_list:
-        print(f"  - {email}")
+    # 验证 SMTP 构造时使用了正确参数
+    import utils.mailer as mailer_module
+    mailer_module.smtplib.SMTP.assert_called_once_with("smtp.gmail.com", 587, timeout=30)
 
 
-if __name__ == "__main__":
-    test_gmail_smtp()
+def test_send_html_calls_sendmail(mock_smtp, mailer):
+    """send_html 应调用 sendmail 发送邮件"""
+    mailer.send_html(
+        subject="FinNews Test",
+        html_body="<html><body><p>Test email</p></body></html>",
+        email_from="test@gmail.com",
+        to_list=["recipient@example.com"],
+    )
+
+    # 验证 sendmail 被调用
+    mock_smtp.sendmail.assert_called_once()
+    call_args = mock_smtp.sendmail.call_args
+    from_addr = call_args[0][0]
+    to_addrs = call_args[0][1]
+    assert from_addr == "test@gmail.com"
+    assert "recipient@example.com" in to_addrs
+
+
+def test_send_html_multiple_recipients(mock_smtp, mailer):
+    """send_html 应支持多个收件人"""
+    recipients = ["user1@example.com", "user2@example.com"]
+    mailer.send_html(
+        subject="Bulk Test",
+        html_body="<html><body><p>Test</p></body></html>",
+        email_from="test@gmail.com",
+        to_list=recipients,
+    )
+
+    call_args = mock_smtp.sendmail.call_args
+    to_addrs = call_args[0][1]
+    for r in recipients:
+        assert r in to_addrs

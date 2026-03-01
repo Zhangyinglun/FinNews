@@ -1,9 +1,6 @@
 """检查 main.py 是否包含 SonarScraper 初始化"""
 
-import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def test_main_contains_sonar_scraper() -> None:
@@ -12,7 +9,3 @@ def test_main_contains_sonar_scraper() -> None:
     with open(main_path, "r", encoding="utf-8") as f:
         content = f.read()
     assert "SonarScraper" in content
-
-
-if __name__ == "__main__":
-    test_main_contains_sonar_scraper()

@@ -1,65 +1,77 @@
 """
-测试 RSS 数据源
+测试 RSS 数据源（mock 版）
 """
 
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import pytest
+from unittest.mock import MagicMock
 
 from scrapers.rss_scraper import RSSFeedScraper
-from utils.logger import setup_logger
-import json
 
 
-def test_rss_scraper():
-    """测试 RSS Scraper 数据抓取"""
-    # 初始化
-    setup_logger()
+@pytest.fixture
+def mock_rss(mocker):
+    """mock session.get 和 feedparser.parse"""
+    # mock HTTP response
+    mock_response = mocker.MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = b"<rss/>"
+    mock_response.raise_for_status = mocker.MagicMock()
+
+    # mock session
+    mock_session = mocker.MagicMock()
+    mock_session.get.return_value = mock_response
+    mocker.patch("scrapers.rss_scraper.requests.Session", return_value=mock_session)
+    mocker.patch("requests.adapters.HTTPAdapter")
+
+    # mock feedparser.parse
+    mock_entry_1 = mocker.MagicMock()
+    mock_entry_1.get = lambda k, default="": {
+        "title": "Gold hits two-month high",
+        "summary": "Gold reached its highest level in two months.",
+        "link": "https://kitco.com/news/1",
+    }.get(k, default)
+    # 添加 published_parsed
+    mock_entry_1.published_parsed = (2026, 3, 1, 10, 0, 0, 5, 60, 0)
+
+    mock_entry_2 = mocker.MagicMock()
+    mock_entry_2.get = lambda k, default="": {
+        "title": "Silver industrial demand strong",
+        "summary": "Industrial silver demand continues to grow.",
+        "link": "https://kitco.com/news/2",
+    }.get(k, default)
+    mock_entry_2.published_parsed = (2026, 3, 1, 9, 0, 0, 5, 60, 0)
+
+    mock_feed = mocker.MagicMock()
+    mock_feed.entries = [mock_entry_1, mock_entry_2]
+    mock_feed.bozo = False
+
+    mocker.patch("scrapers.rss_scraper.feedparser.parse", return_value=mock_feed)
+    return mock_feed
+
+
+def test_rss_scraper_returns_data(mock_rss):
+    """RSSFeedScraper.fetch() 应返回非空数据"""
     scraper = RSSFeedScraper()
-
-    # 抓取数据
-    print("=" * 80)
-    print("正在抓取 RSS 数据...")
-    print("=" * 80)
-
     data = scraper.run()
 
-    print(f"\n✅ 抓取完成！共获取 {len(data)} 条记录\n")
-
-    # 统计每个源的数量
-    feed_stats = {}
-    for item in data:
-        feed_name = item.get("feed_name", "Unknown")
-        feed_stats[feed_name] = feed_stats.get(feed_name, 0) + 1
-
-    print("📊 各数据源统计:")
-    for feed_name, count in feed_stats.items():
-        print(f"  - {feed_name}: {count} 条")
-    print()
-
-    # 显示前5条详细数据
-    print("📰 前5条新闻详情:")
-    for idx, item in enumerate(data[:5], 1):
-        print(f"\n【记录 {idx}】")
-        print(f"标题: {item.get('title', 'N/A')}")
-        print(f"摘要: {item.get('summary', 'N/A')[:200]}...")
-        print(f"URL: {item.get('url', 'N/A')}")
-        print(f"时间: {item.get('timestamp', 'N/A')}")
-        print(f"来源: {item.get('feed_name', 'N/A')}")
-        print("-" * 80)
-
-    # 保存为 JSON 方便查看
-    output_file = str(Path(__file__).resolve().parent / "output_rss.json")
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-
-    print(f"\n💾 详细数据已保存到: {output_file}")
-
-    # 断言基本验证
-    assert len(data) > 0, "应该获取到至少一条数据"
-    assert "feed_name" in data[0], "记录应该包含feed_name字段"
+    assert isinstance(data, list)
+    assert len(data) > 0
 
 
-if __name__ == "__main__":
-    test_rss_scraper()
+def test_rss_record_has_feed_name(mock_rss):
+    """每条记录应包含 feed_name 字段"""
+    scraper = RSSFeedScraper()
+    data = scraper.run()
+
+    assert len(data) > 0
+    for record in data:
+        assert "feed_name" in record, "记录应该包含feed_name字段"
+
+
+def test_rss_record_type(mock_rss):
+    """记录类型应为 news"""
+    scraper = RSSFeedScraper()
+    data = scraper.run()
+
+    for record in data:
+        assert record.get("type") == "news", "所有记录应为 news 类型"

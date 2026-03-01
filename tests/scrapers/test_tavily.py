@@ -1,58 +1,69 @@
 """
-测试 Tavily 数据源
+测试 Tavily 数据源（mock 版）
 """
 
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import pytest
 
 from scrapers.tavily_scraper import TavilyScraper
-from utils.logger import setup_logger
-import json
 
 
-def test_tavily_scraper():
-    """测试 Tavily Scraper 数据抓取"""
-    # 初始化
-    setup_logger()
+@pytest.fixture
+def mock_tavily(mocker, monkeypatch):
+    """mock TavilyClient"""
+    monkeypatch.setenv("TAVILY_API_KEY", "dummy_key")
+
+    mock_client = mocker.MagicMock()
+    from datetime import datetime
+    # 使用 naive datetime（无时区）避免 aware vs naive 比较异常
+    now_str = datetime.now().isoformat()
+    mock_client.search.return_value = {
+        "results": [
+            {
+                "title": "Gold prices surge on Fed rate cut hopes",
+                "url": "https://reuters.com/gold-1",
+                "content": "Gold futures rose sharply as investors bet on rate cuts.",
+                "score": 0.95,
+                "published_date": now_str,
+                "source": "reuters.com",
+            },
+            {
+                "title": "Silver demand rises in industrial sector",
+                "url": "https://bloomberg.com/silver-1",
+                "content": "Silver prices gain as industrial demand improves.",
+                "score": 0.88,
+                "published_date": now_str,
+                "source": "bloomberg.com",
+            },
+        ]
+    }
+    mocker.patch("scrapers.tavily_scraper.TavilyClient", return_value=mock_client)
+    return mock_client
+
+
+def test_tavily_scraper_returns_data(mock_tavily):
+    """TavilyScraper.fetch() 应返回非空数据"""
     scraper = TavilyScraper()
-
-    # 抓取数据
-    print("=" * 80)
-    print("正在抓取 Tavily 数据...")
-    print("=" * 80)
-
     data = scraper.run()
 
-    print(f"\n✅ 抓取完成！共获取 {len(data)} 条记录\n")
-
-    # 显示详细数据
-    for idx, item in enumerate(data, 1):
-        print(f"【记录 {idx}】")
-        print(f"标题: {item.get('title', 'N/A')}")
-        print(f"摘要: {item.get('summary', 'N/A')[:150]}...")
-        print(f"URL: {item.get('url', 'N/A')}")
-        print(f"时间: {item.get('timestamp', 'N/A')}")
-        print(f"来源: {item.get('source', 'N/A')}")
-        print(f"相关性评分: {item.get('relevance_score', 'N/A')}")
-        print("-" * 80)
-
-    # 保存为 JSON 方便查看
-    output_file = str(Path(__file__).resolve().parent / "output_tavily.json")
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
-
-    print(f"\n💾 详细数据已保存到: {output_file}")
-
-    # 断言基本验证
-    if len(data) == 0 and getattr(scraper, "quota_exceeded", False):
-        print("⚠️ Tavily API 用量已达上限，本次跳过断言")
-        return
-    assert len(data) > 0, "应该获取到至少一条数据"
-    assert "title" in data[0], "记录应该包含title字段"
-    assert "source" in data[0], "记录应该包含source字段"
+    assert isinstance(data, list)
+    assert len(data) > 0
 
 
-if __name__ == "__main__":
-    test_tavily_scraper()
+def test_tavily_record_has_required_fields(mock_tavily):
+    """每条记录应包含 title 和 source"""
+    scraper = TavilyScraper()
+    data = scraper.run()
+
+    assert len(data) > 0
+    first = data[0]
+    assert "title" in first, "记录应该包含title字段"
+    assert "source" in first, "记录应该包含source字段"
+
+
+def test_tavily_record_type(mock_tavily):
+    """记录类型应为 news"""
+    scraper = TavilyScraper()
+    data = scraper.run()
+
+    for record in data:
+        assert record.get("type") == "news", "所有记录应为 news 类型"

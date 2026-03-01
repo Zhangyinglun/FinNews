@@ -2,29 +2,30 @@
 测试 Deduplicator 去重模块
 """
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from processors.deduplicator import Deduplicator
-from utils.logger import setup_logger
-from datetime import datetime, timedelta
-import json
 
 
-def test_deduplicator():
-    """测试 Deduplicator 去重功能"""
-    # 初始化
-    setup_logger()
-    deduplicator = Deduplicator(time_window_hours=24)
+def _build_deduplicator(
+    *,
+    hours: int = 24,
+    threshold: float = 0.75,
+    state_file: Path,
+) -> Deduplicator:
+    return Deduplicator(
+        time_window_hours=hours,
+        similarity_threshold=threshold,
+        state_file=state_file,
+    )
 
-    print("=" * 80)
-    print("正在测试 Deduplicator...")
-    print("=" * 80)
 
-    # 测试数据
-    now = datetime.now()
+def test_exact_and_stale_and_special_types(tmp_path) -> None:
+    """测试精确去重、时效过滤和特殊类型保留"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    state_file = tmp_path / "dedup_state.json"
+    deduplicator = _build_deduplicator(state_file=state_file)
 
     test_records = [
         {
@@ -36,9 +37,9 @@ def test_deduplicator():
         },
         {
             "type": "news",
-            "title": "Gold prices rise",  # 重复内容
+            "title": "Gold prices rise",
             "summary": "Gold futures increased on inflation concerns",
-            "source": "Bloomberg",  # 不同来源，但内容相同
+            "source": "Bloomberg",
             "timestamp": now - timedelta(hours=1),
         },
         {
@@ -50,132 +51,171 @@ def test_deduplicator():
         },
         {
             "type": "news",
-            "title": "Old news article",  # 时间窗口外
+            "title": "Old news article",
             "summary": "This is an old article",
             "source": "WSJ",
-            "timestamp": now - timedelta(hours=30),  # 超过12小时窗口
+            "timestamp": now - timedelta(hours=30),
         },
         {
-            "type": "price_data",  # 价格数据，应该保留
+            "type": "price_data",
             "ticker": "GC=F",
             "price": 2050.12,
             "timestamp": now,
         },
         {
-            "type": "price_data",  # 价格数据，即使重复也应该保留
-            "ticker": "GC=F",
-            "price": 2050.12,
-            "timestamp": now - timedelta(minutes=30),
-        },
-        {
-            "type": "economic_data",  # 经济数据，应该保留
+            "type": "economic_data",
             "indicator": "CPI",
             "value": 3.2,
             "timestamp": now,
         },
+        {
+            "type": "fx_data",
+            "pair": "USD/CNY",
+            "rate": 7.23,
+            "timestamp": now,
+        },
     ]
 
-    print(f"\n输入记录: {len(test_records)} 条\n")
-
-    # 执行去重
     unique_data = deduplicator.deduplicate(test_records)
 
-    print(f"\n✅ 去重完成！输出记录: {len(unique_data)} 条\n")
+    news = [r for r in unique_data if r.get("type") == "news"]
+    assert len(news) == 2, "应保留2条新闻（去掉1条精确重复+1条过期）"
+    assert all(r.get("title") != "Old news article" for r in news), "过期新闻应被过滤"
 
-    # 显示详细结果
-    print("=" * 80)
-    print("去重后的数据:")
-    print("=" * 80)
-
-    for idx, record in enumerate(unique_data, 1):
-        print(f"\n【记录 {idx}】")
-        print(f"类型: {record.get('type', 'N/A')}")
-        print(f"标题: {record.get('title', 'N/A')}")
-        print(
-            f"摘要: {record.get('summary', 'N/A')[:100]}..."
-            if record.get("summary")
-            else f"数据: {record.get('ticker') or record.get('indicator', 'N/A')}"
-        )
-        print(f"时间: {record.get('timestamp', 'N/A')}")
-        print(f"来源: {record.get('source', 'N/A')}")
-        print("-" * 80)
-
-    # 保存结果
-    output_file = str(Path(__file__).resolve().parent / "output_deduplicator.json")
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "input_count": len(test_records),
-                "output_count": len(unique_data),
-                "duplicates_removed": len(test_records) - len(unique_data),
-                "time_window_hours": 24,
-                "unique_data": unique_data,
-            },
-            f,
-            ensure_ascii=False,
-            indent=2,
-            default=str,
-        )
-
-    print(f"\n💾 详细数据已保存到: {output_file}")
-
-    # 断言验证
-    assert len(unique_data) < len(test_records), "应该移除一些重复记录"
-
-    # 验证内容去重
-    news_records = [r for r in unique_data if r.get("type") == "news"]
-    titles = [r.get("title") for r in news_records]
-    assert len(titles) == len(set(titles)), "新闻标题不应该有重复"
-
-    # 验证时间窗口过滤
-    old_news = next(
-        (r for r in unique_data if r.get("title") == "Old news article"), None
-    )
-    assert old_news is None, "时间窗口外的记录应该被过滤"
-
-    # 验证价格/经济数据保留
     price_records = [r for r in unique_data if r.get("type") == "price_data"]
     economic_records = [r for r in unique_data if r.get("type") == "economic_data"]
-    assert len(price_records) == 2, "价格数据应该全部保留"
-    assert len(economic_records) == 1, "经济数据应该保留"
+    fx_records = [r for r in unique_data if r.get("type") == "fx_data"]
+    assert len(price_records) == 1, "价格数据应保留"
+    assert len(economic_records) == 1, "经济数据应保留"
+    assert len(fx_records) == 1, "外汇数据应保留"
 
-    print("\n✅ 所有断言测试通过！")
 
+def test_fuzzy_deduplication(tmp_path) -> None:
+    """测试标题模糊匹配去重"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    state_file = tmp_path / "dedup_state.json"
+    deduplicator = _build_deduplicator(state_file=state_file, threshold=0.74)
 
-def test_reset():
-    """测试重置功能"""
-    print("\n" + "=" * 80)
-    print("测试重置功能...")
-    print("=" * 80)
-
-    deduplicator = Deduplicator()
-
-    # 添加一些记录
     test_records = [
         {
             "type": "news",
-            "title": "Test article",
-            "summary": "Test summary",
-            "timestamp": datetime.now(),
-        }
+            "title": "Gold prices jump as Fed signals rate cuts",
+            "summary": "Gold climbs after dovish Fed comments",
+            "source": "Reuters",
+            "timestamp": now - timedelta(hours=1),
+        },
+        {
+            "type": "news",
+            "title": "Gold price jumps as Fed hints at cutting rates",
+            "summary": "Investors moved to safe-haven assets",
+            "source": "Bloomberg",
+            "timestamp": now - timedelta(minutes=20),
+        },
     ]
 
-    deduplicator.deduplicate(test_records)
-    hash_count_before = len(deduplicator.seen_hashes)
-    print(f"重置前哈希数: {hash_count_before}")
+    unique_data = deduplicator.deduplicate(test_records)
+    news = [r for r in unique_data if r.get("type") == "news"]
+    assert len(news) == 1, "相似标题应被模糊去重"
 
-    # 重置
+
+def test_cross_run_persistence(tmp_path) -> None:
+    """测试跨运行持久化去重"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    state_file = tmp_path / "dedup_state.json"
+
+    # 第一次运行
+    deduplicator1 = _build_deduplicator(state_file=state_file)
+    first_batch = [
+        {
+            "type": "news",
+            "title": "Silver demand climbs on solar growth",
+            "summary": "Industrial demand pushes silver higher",
+            "source": "Reuters",
+            "timestamp": now - timedelta(hours=2),
+        }
+    ]
+    out1 = deduplicator1.deduplicate(first_batch)
+    assert len(out1) == 1, "首次应保留新闻"
+    assert state_file.exists(), "首次运行后应生成状态文件"
+
+    # 第二次运行（新实例）
+    deduplicator2 = _build_deduplicator(state_file=state_file)
+    second_batch = [
+        {
+            "type": "news",
+            "title": "Silver demand climbs on solar growth",
+            "summary": "Industrial demand pushes silver higher",
+            "source": "Bloomberg",
+            "timestamp": now - timedelta(minutes=30),
+        }
+    ]
+    out2 = deduplicator2.deduplicate(second_batch)
+    assert len(out2) == 0, "跨运行重复新闻应被去重"
+
+
+def test_timezone_and_invalid_timestamp_handling(tmp_path) -> None:
+    """测试时区处理与异常时间戳兜底"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    state_file = tmp_path / "dedup_state.json"
+    deduplicator = _build_deduplicator(state_file=state_file)
+
+    tz_aware_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    bad_time = "not-a-timestamp"
+
+    records = [
+        {
+            "type": "news",
+            "title": "Fed keeps rates unchanged",
+            "summary": "Committee waits for more inflation data",
+            "source": "WSJ",
+            "timestamp": tz_aware_time,
+        },
+        {
+            "type": "news",
+            "title": "US dollar index moves slightly higher",
+            "summary": "Traders await payrolls report",
+            "source": "CNBC",
+            "timestamp": bad_time,
+        },
+        {
+            "type": "news",
+            "title": "Very old event",
+            "summary": "Out of window",
+            "source": "Example",
+            "timestamp": now - timedelta(hours=40),
+        },
+    ]
+
+    output = deduplicator.deduplicate(records)
+    titles = {item.get("title") for item in output}
+
+    assert "Fed keeps rates unchanged" in titles, "带时区的时间应被正确解析"
+    assert "US dollar index moves slightly higher" in titles, "异常时间戳应回退为当前时间"
+    assert "Very old event" not in titles, "超时窗口的新闻应被过滤"
+
+
+def test_reset(tmp_path) -> None:
+    """测试 reset 会清空内存状态并删除状态文件"""
+    state_file = tmp_path / "dedup_state.json"
+    deduplicator = _build_deduplicator(state_file=state_file)
+
+    deduplicator.deduplicate(
+        [
+            {
+                "type": "news",
+                "title": "Test article",
+                "summary": "Test summary",
+                "timestamp": datetime.now(timezone.utc).replace(tzinfo=None),
+            }
+        ]
+    )
+
+    assert len(deduplicator.seen_hashes) > 0, "重置前应有哈希"
+    assert len(deduplicator.seen_titles) > 0, "重置前应有标题"
+    assert state_file.exists(), "重置前状态文件应存在"
+
     deduplicator.reset()
-    hash_count_after = len(deduplicator.seen_hashes)
-    print(f"重置后哈希数: {hash_count_after}")
 
-    assert hash_count_before > 0, "重置前应该有哈希"
-    assert hash_count_after == 0, "重置后哈希应该清空"
-
-    print("✅ 重置功能测试通过！")
-    print("=" * 80)
-
-
-if __name__ == "__main__":
-    test_deduplicator()
-    test_reset()
+    assert len(deduplicator.seen_hashes) == 0, "重置后哈希应清空"
+    assert len(deduplicator.seen_titles) == 0, "重置后标题应清空"
+    assert not state_file.exists(), "重置后状态文件应删除"

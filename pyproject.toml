@@ -1,0 +1,17 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--strict-markers", "--tb=short"]
+markers = [
+    "slow: 耗时测试",
+    "integration: 集成测试",
+]
+norecursedirs = [".git", ".claude", "outputs", "venv", "__pycache__"]
+log_cli = true
+log_cli_level = "WARNING"
+filterwarnings = [
+    "ignore::DeprecationWarning:yfinance",
+    "ignore::FutureWarning:yfinance",
+]

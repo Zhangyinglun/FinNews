@@ -1,156 +1,124 @@
-"""生成摘要并保存为HTML文件（不发送邮件）
-
-使用当前 outputs/raw 目录中的最新数据生成摘要。
-
-Prereqs:
-- Set OPENROUTER_API_KEY in .env
-- Run `python main.py` first to generate data (or use sample data)
-
-Run:
-  python -m tests.utils.test_digest_to_file
+"""
+测试摘要生成并保存为 HTML 文件（mock 版）
 """
 
-import sys
 import json
-from pathlib import Path
+import pytest
 from datetime import datetime
-from copy import deepcopy
+from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
-from config.config import Config
-from utils.digest_controller import DIGEST_JSON_SCHEMA, DigestController
+from utils.digest_controller import DigestController
 from utils.openrouter_client import OpenRouterClient
 from analyzers.rule_engine import RuleEngine
 from analyzers.market_analyzer import MarketAnalyzer
+from models.market_data import MultiWindowData
 
 
-def load_latest_processed_data():
-    """从 outputs/raw 加载最新的原始 JSON 数据"""
-    raw_dir = Config.RAW_DIR
-    json_files = sorted(
-        raw_dir.glob("raw_*.json"), key=lambda p: p.stat().st_mtime, reverse=True
-    )
+FAKE_DIGEST = {
+    "subject": "【黄金白银】市场观察日报",
+    "key_news": [
+        {
+            "title": "黄金价格在美联储信号前保持稳定",
+            "source": "Reuters",
+            "summary": "黄金在等待联储官员讲话期间基本持平。",
+            "url": "https://example.com/1",
+            "impact_tag": "#Neutral",
+        }
+    ],
+    "other_news": [],
+    "analysis": {
+        "market_sentiment": "谨慎",
+        "price_outlook": "中性偏多",
+        "risk_factors": "联储政策",
+        "trading_suggestion": "持仓观望",
+    },
+}
 
-    if not json_files:
-        raise FileNotFoundError("No raw data found. Run 'python main.py' first.")
+# 内联测试数据（不依赖真实 outputs/ 目录）
+SAMPLE_RECORDS = [
+    {
+        "type": "price_data",
+        "ticker_name": "gold_futures",
+        "ticker": "GC=F",
+        "price": 2050.12,
+        "change_percent": 0.8,
+        "source": "YFinance",
+        "timestamp": datetime.now(),
+    },
+    {
+        "type": "price_data",
+        "ticker_name": "silver_futures",
+        "ticker": "SI=F",
+        "price": 23.45,
+        "change_percent": 0.5,
+        "source": "YFinance",
+        "timestamp": datetime.now(),
+    },
+    {
+        "type": "news",
+        "title": "Gold steadies as traders await Fed guidance",
+        "summary": "Gold prices were little changed as markets awaited commentary.",
+        "url": "https://example.com/gold-fed",
+        "source": "Reuters",
+        "timestamp": datetime.now(),
+    },
+]
 
-    latest_file = json_files[0]
-    print(f"Loading data from: {latest_file}")
 
-    with open(latest_file, "r", encoding="utf-8") as f:
-        return json.load(f)
+@pytest.fixture
+def mock_openrouter(mocker):
+    """mock OpenRouter API 返回预构造 JSON"""
+    mock_response = mocker.MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": json.dumps(FAKE_DIGEST), "role": "assistant"}}]
+    }
+    mock_response.raise_for_status = mocker.MagicMock()
+
+    mock_session = mocker.MagicMock()
+    mock_session.post.return_value = mock_response
+    mocker.patch("utils.openrouter_client.requests.Session", return_value=mock_session)
+    return mock_session
 
 
-def test_digest_to_file():
-    """测试摘要生成并保存为文件"""
-    if not Config.OPENROUTER_API_KEY:
-        raise SystemExit("Missing OPENROUTER_API_KEY in .env")
-
-    # 加载最新数据
-    records = load_latest_processed_data()
-    print(f"Loaded {len(records)} records")
-
+def test_digest_pipeline_generates_html(mock_openrouter, tmp_path):
+    """完整管道：数据 → 规则引擎 → 摘要控制器 → HTML 文件"""
     # 规则引擎分析
-    price_data = [r for r in records if r.get("type") == "price_data"]
+    price_data = [r for r in SAMPLE_RECORDS if r.get("type") == "price_data"]
     rule_engine = RuleEngine()
     market_signal = rule_engine.analyze(price_data)
 
-    print(f"VIX: {market_signal.vix_value or 'N/A'}")
-    print(f"VIX Alert: {market_signal.vix_alert_level.value}")
-    print(f"Macro Bias: {market_signal.macro_bias.value}")
-
     # 市场分析器组织数据
     market_analyzer = MarketAnalyzer()
-    multi_window_data = market_analyzer.organize_data(records, market_signal)
-
-    # 为了避免测试超时，限制发送给 LLM 的新闻数量
-    compact_data = deepcopy(multi_window_data)
-    compact_data.flash.news = compact_data.flash.news[:8]
-    compact_data.cycle.news = compact_data.cycle.news[:5]
-    compact_data.trend.news = compact_data.trend.news[:5]
-
-    print(f"\nFlash news: {len(multi_window_data.flash.news)}")
-    print(f"Cycle news: {len(multi_window_data.cycle.news)}")
-    print(f"Trend news: {len(multi_window_data.trend.news)}")
+    multi_window_data = market_analyzer.organize_data(SAMPLE_RECORDS, market_signal)
 
     # 创建摘要控制器
     controller = DigestController()
-    user_prompt, stats = controller.build_llm_prompt(compact_data, market_signal)
 
-    print(f"\nPrompt size: {len(user_prompt)} chars")
-    print("Calling OpenRouter...")
-
-    # 调用 OpenRouter
-    client = OpenRouterClient(
-        api_key=Config.OPENROUTER_API_KEY,
-        model=Config.OPENROUTER_MODEL,
-        timeout=min(Config.OPENROUTER_TIMEOUT, 60),
-        max_retries=1,
-        http_referer=Config.OPENROUTER_HTTP_REFERER,
-        x_title=Config.OPENROUTER_X_TITLE,
-    )
-
-    # 4段式系统提示 (仅返回结构化JSON数据，不生成HTML)
-    system_prompt = """你是一位专业的金融分析师，专注于黄金白银市场。
-请根据提供的多窗口数据，返回结构化的JSON数据。
-
-你的任务:
-1. 生成邮件标题 (subject)
-2. 将所有新闻按事件/主题进行语义聚合，生成新闻综述组 (news_clusters)
-   - 报道同一事件的不同角度新闻合并到同一个 cluster
-   - 独立新闻单独成组
-   - cluster 按重要性排序，每个 cluster 内 sources 也按重要性排序
-3. 撰写市场分析 (analysis)
-
-重要规则:
-- 所有英文新闻标题和摘要必须翻译成中文
-- 新闻综述只陈述事实，不要添加任何分析性语言
-- 所有分析、判断、建议必须放在analysis字段
-- 使用中文，专业但易懂
-- 严格按照JSON Schema返回结果"""
-
-    resp = client.chat_completions(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        temperature=0.2,
-        max_tokens=min(Config.OPENROUTER_MAX_TOKENS, 1200),
-        response_format={"type": "json_schema", "json_schema": DIGEST_JSON_SCHEMA},
-        reasoning_effort="low",
-    )
-
-    print("OpenRouter call completed")
-
-    # 解析响应
-    content = resp.get("choices", [{}])[0].get("message", {}).get("content")
-    if not isinstance(content, str):
-        raise SystemExit(f"Unexpected response content: {content}")
-
-    digest = json.loads(content)
-
-    subject = digest.get("subject") or controller.get_email_subject(market_signal)
+    # 渲染 HTML
     email_html, _ = controller.render_email_html(
-        digest_data=digest,
+        digest_data=FAKE_DIGEST,
         signal=market_signal,
-        data=compact_data,
+        data=multi_window_data,
     )
-    if not email_html:
-        raise SystemExit("未生成有效的HTML邮件内容")
+
+    assert isinstance(email_html, str) and email_html.strip(), "应生成有效的HTML邮件内容"
 
     # 保存为 HTML 文件
-    output_file = (
-        Config.OUTPUT_DIR
-        / f"digest_preview_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-    )
+    output_file = tmp_path / "digest_preview.html"
+    output_file.write_text(email_html, encoding="utf-8")
 
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(email_html)
-
-    print(f"\n✅ Digest saved to: {output_file}")
-    print(f"Subject: {subject}")
-    print(f"HTML长度: {len(email_html)} 字符")
-    print(f"\nOpen in browser: file:///{output_file.absolute()}")
+    assert output_file.exists(), "HTML 文件应被创建"
+    assert output_file.stat().st_size > 100, "HTML 文件应有实际内容"
 
 
-if __name__ == "__main__":
-    test_digest_to_file()
+def test_digest_subject_from_signal(mock_openrouter):
+    """摘要控制器应能从市场信号生成邮件标题"""
+    price_data = [r for r in SAMPLE_RECORDS if r.get("type") == "price_data"]
+    rule_engine = RuleEngine()
+    market_signal = rule_engine.analyze(price_data)
+
+    controller = DigestController()
+    subject = controller.get_email_subject(market_signal)
+
+    assert isinstance(subject, str) and subject.strip(), "应生成有效的邮件标题"

@@ -2,42 +2,50 @@
 测试 DuckDuckGo Scraper
 """
 
-import sys
 import unittest
 from unittest.mock import patch
-from pathlib import Path
-
-# 添加项目根目录到路径
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from scrapers.ddg_scraper import DuckDuckGoScraper
-from config.config import Config
 
 
 class TestDuckDuckGoScraper(unittest.TestCase):
     def setUp(self):
         self.scraper = DuckDuckGoScraper()
-        # 使用少量查询以加快测试
         self.scraper.flash_queries = ["gold price news"]
         self.scraper.cycle_queries = []
         self.scraper.trend_queries = []
 
     def test_fetch(self):
-        print("\n正在测试 DDG 抓取 (可能需要几秒钟)...")
-        results = self.scraper.fetch()
+        """mock DDG 搜索，验证返回格式"""
+        class FakeDDGS:
+            def news(self, **kwargs):
+                return [
+                    {
+                        "title": "Gold prices steady",
+                        "url": "http://example.com/gold",
+                        "body": "Gold remains steady amid market uncertainty",
+                        "date": "2026-03-01T10:00:00+00:00",
+                        "source": "Reuters",
+                    }
+                ]
+
+        fake = FakeDDGS()
+        with (
+            patch("scrapers.ddg_scraper.DDGSClass", return_value=fake),
+            patch("scrapers.ddg_scraper.DDG_AVAILABLE", True),
+        ):
+            scraper = DuckDuckGoScraper()
+            scraper.flash_queries = ["gold price news"]
+            scraper.cycle_queries = []
+            scraper.trend_queries = []
+            results = scraper.fetch()
 
         self.assertIsInstance(results, list)
-        if not results:
-            print("警告: DDG 未返回任何结果 (可能是网络问题或没有任何匹配)")
-            return
-
-        print(f"抓取到 {len(results)} 条结果")
+        self.assertTrue(len(results) > 0)
         first = results[0]
-        print(f"示例: {first.get('title')} ({first.get('url')})")
-
         self.assertEqual(first["source"], "duckduckgo")
-        self.assertTrue("title" in first)
-        self.assertTrue("url" in first)
+        self.assertIn("title", first)
+        self.assertIn("url", first)
         self.assertEqual(first["type"], "news")
 
     def test_fetch_fallback_to_text_when_news_empty(self):
@@ -146,7 +154,3 @@ class TestDuckDuckGoScraper(unittest.TestCase):
         self.assertTrue(results)
         self.assertEqual(len(fake.news_calls), 1)
         self.assertNotIn("backend", fake.news_calls[0])
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -2,21 +2,14 @@
 测试 PriceCacheManager
 """
 
-import sys
-from pathlib import Path
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
 from utils.price_cache_manager import PriceCacheManager
-from config.config import Config
 
 
-def test_cache_manager():
-    # 使用临时缓存文件
-    test_cache = Config.STORAGE_DIR / "test_price_cache.json"
-    if test_cache.exists():
-        test_cache.unlink()
+def test_cache_manager(tmp_path):
+    """测试缓存更新、加载与回退功能"""
+    test_cache = tmp_path / "test_price_cache.json"
 
     manager = PriceCacheManager(cache_file=test_cache)
 
@@ -45,13 +38,3 @@ def test_cache_manager():
     assert fallback[0]["ticker_name"] == "gold_futures"
     assert fallback[0]["is_fallback"] is True
     assert "Cache" in fallback[0]["source"]
-
-    print("✅ PriceCacheManager 测试通过")
-
-    # 清理
-    if test_cache.exists():
-        test_cache.unlink()
-
-
-if __name__ == "__main__":
-    test_cache_manager()
