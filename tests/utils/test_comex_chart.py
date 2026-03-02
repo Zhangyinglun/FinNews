@@ -94,3 +94,19 @@ def test_empty_history_returns_none(tmp_path):
     gen = ComexChartGenerator(fake_file)
     chart = gen.generate_chart("silver", days=14)
     assert chart is None
+
+
+def test_chart_output_resolution(history_file):
+    """图表输出为 Retina 分辨率 1120×600"""
+    import base64
+    from io import BytesIO
+
+    from PIL import Image
+
+    generator = ComexChartGenerator(history_file)
+    chart_base64 = generator.generate_chart("silver", days=14)
+
+    assert chart_base64 is not None
+    img_bytes = base64.decodebytes(chart_base64.encode("utf-8"))
+    img = Image.open(BytesIO(img_bytes))
+    assert img.size == (1120, 600), f"期望 1120×600，实际 {img.size}"
