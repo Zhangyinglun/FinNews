@@ -12,6 +12,7 @@ from utils.openrouter_client import OpenRouterClient
 from analyzers.rule_engine import RuleEngine
 from analyzers.market_analyzer import MarketAnalyzer
 from models.market_data import MultiWindowData
+from models.analysis import ComexSignal, ComexAlertLevel
 
 
 FAKE_DIGEST = {
@@ -92,6 +93,27 @@ def test_digest_pipeline_generates_html(mock_openrouter, tmp_path):
     market_analyzer = MarketAnalyzer()
     multi_window_data = market_analyzer.organize_data(SAMPLE_RECORDS, market_signal)
 
+    # 创建 COMEX 示例数据
+    comex_signal = ComexSignal(
+        silver_registered=35_000_000.0,
+        silver_registered_million=35.0,
+        silver_total=280_000_000.0,
+        silver_alert_level=ComexAlertLevel.YELLOW,
+        silver_alert_message="⚠️ 白银Registered库存低于40M oz警戒线，当前35.00M oz",
+        silver_recommendation="密切关注库存变化趋势，考虑逐步建仓",
+        silver_daily_change_pct=-1.2,
+        silver_weekly_change_pct=-3.5,
+        gold_registered=8_500_000.0,
+        gold_registered_million=8.50,
+        gold_total=22_000_000.0,
+        gold_alert_level=ComexAlertLevel.SAFE,
+        gold_alert_message="",
+        gold_recommendation="",
+        gold_daily_change_pct=0.3,
+        gold_weekly_change_pct=1.1,
+        report_date=datetime(2026, 2, 28),
+    )
+
     # 创建摘要控制器
     controller = DigestController()
 
@@ -100,6 +122,7 @@ def test_digest_pipeline_generates_html(mock_openrouter, tmp_path):
         digest_data=FAKE_DIGEST,
         signal=market_signal,
         data=multi_window_data,
+        comex_signal=comex_signal,
     )
 
     assert isinstance(email_html, str) and email_html.strip(), "应生成有效的HTML邮件内容"
