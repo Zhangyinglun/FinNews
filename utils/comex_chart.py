@@ -118,6 +118,7 @@ class ComexChartGenerator:
             logger.warning(f"无法生成 {metal} 图表: 数据不足")
             return None
 
+        fig = None
         try:
             colors = _METAL[metal]
             fig, ax = plt.subplots(
@@ -247,7 +248,6 @@ class ComexChartGenerator:
                 buffer, format="PNG", dpi=_DPI,
                 facecolor=fig.get_facecolor(),
             )
-            plt.close(fig)
 
             img_base64 = base64.encodebytes(buffer.getvalue()).decode("utf-8")
             logger.info(f"✅ {metal} 图表生成成功 (matplotlib 版, 1120×600)")
@@ -256,6 +256,9 @@ class ComexChartGenerator:
         except Exception as e:
             logger.error(f"matplotlib 生成图表失败: {e}", exc_info=True)
             return None
+        finally:
+            if fig is not None:
+                plt.close(fig)
 
     def generate_all_charts(self, days: int = 14) -> Dict[str, Optional[str]]:
         """生成所有品种的图表。"""
