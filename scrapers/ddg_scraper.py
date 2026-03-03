@@ -14,12 +14,7 @@ try:
 
     DDG_AVAILABLE = True
 except ImportError:
-    try:
-        from duckduckgo_search import DDGS as DDGSClass
-
-        DDG_AVAILABLE = True
-    except ImportError:
-        DDG_AVAILABLE = False
+    DDG_AVAILABLE = False
 
 from .base_scraper import BaseScraper
 from config.config import Config

@@ -35,8 +35,9 @@ class EtfScraper(BaseScraper):
         response = requests.get(self.url, timeout=30)
         response.raise_for_status()
 
-        # 解析 CSV
-        f = io.StringIO(response.text)
+        # 规范化换行符（兼容 CR-only、CRLF、LF），避免 csv 解析错误
+        normalized = response.text.replace('\r\n', '\n').replace('\r', '\n')
+        f = io.StringIO(normalized)
         reader = csv.DictReader(f)
         rows = list(reader)
 

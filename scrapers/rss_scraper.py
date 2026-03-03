@@ -4,6 +4,7 @@ RSS Feed Parser - Kitco, FXStreet等垂直行业源
 """
 
 import time
+import warnings
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -72,8 +73,15 @@ class RSSFeedScraper(BaseScraper):
                 response = self.session.get(feed_url, timeout=10)
                 response.raise_for_status()
 
-                # 解析RSS
-                feed = feedparser.parse(response.content)  # type: ignore[union-attr]
+                # 解析RSS（抑制 feedparser issue#310 的临时向后兼容警告）
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message=".*temporary mapping.*updated_parsed.*",
+                        category=DeprecationWarning,
+                        module="feedparser",
+                    )
+                    feed = feedparser.parse(response.content)  # type: ignore[union-attr]
 
                 if feed.bozo:
                     self.logger.warning(
