@@ -50,7 +50,7 @@ tqdm==4.67.3                  # 进度条显示
 # ========================================
 # Network Optimization (yfinance优化)
 # ========================================
-curl-cffi==0.7.3              # Session复用优化
+curl-cffi>=0.7.3              # Session复用优化（Chrome指纹伪装，>=0.7.3支持impersonate）
 
 # ========================================
 # Optional: Advanced Features
