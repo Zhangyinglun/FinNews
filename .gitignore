@@ -82,5 +82,9 @@ outputs/*_test.html
 # OpenCode IDE
 .opencode/
 
+# Claude / local tool settings
+.claude/settings.local.json
+outputs/.claude/
+
 # Diagnostic scripts
 diagnose_*.py

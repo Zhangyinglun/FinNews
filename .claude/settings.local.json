@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebSearch",
-      "mcp__claude_ai_Gmail__gmail_get_profile"
-    ]
-  }
-}

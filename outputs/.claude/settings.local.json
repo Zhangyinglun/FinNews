@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__plugin_episodic-memory_episodic-memory__read",
-      "mcp__plugin_episodic-memory_episodic-memory__search"
-    ]
-  }
-}
