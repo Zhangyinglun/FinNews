@@ -47,9 +47,15 @@ Edit `.env` and add your API keys:
 # Required API Keys
 TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxxxxxxxx
 FRED_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENROUTER_API_KEY=sk-or-your-openrouter-api-key
 
 # Optional API Keys
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key_here
+
+# OpenRouter digest defaults
+OPENROUTER_MODEL=deepseek/deepseek-v3.2
+OPENROUTER_ENABLE_RESPONSE_HEALING=true
+OPENROUTER_REQUIRE_PARAMETERS=true
 ```
 
 **How to Obtain API Keys:**

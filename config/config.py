@@ -405,7 +405,7 @@ class Config:
     )
 
     OPENROUTER_API_KEY = _getenv_str_optional("OPENROUTER_API_KEY")
-    OPENROUTER_MODEL = _getenv_str("OPENROUTER_MODEL", "google/gemini-3-pro-preview")
+    OPENROUTER_MODEL = _getenv_str("OPENROUTER_MODEL", "deepseek/deepseek-v3.2")
     OPENROUTER_TEMPERATURE = _getenv_float("OPENROUTER_TEMPERATURE", "0.3")
     OPENROUTER_MAX_TOKENS = _getenv_int("OPENROUTER_MAX_TOKENS", "8192")
     OPENROUTER_TIMEOUT = _getenv_int("OPENROUTER_TIMEOUT", "120")
@@ -416,6 +416,12 @@ class Config:
         str(OPENROUTER_TIMEOUT * OPENROUTER_MAX_RETRIES + 10),
     )
     OPENROUTER_REASONING_EFFORT = _getenv_str("OPENROUTER_REASONING_EFFORT", "medium")
+    OPENROUTER_ENABLE_RESPONSE_HEALING = _getenv_bool(
+        "OPENROUTER_ENABLE_RESPONSE_HEALING", "true"
+    )
+    OPENROUTER_REQUIRE_PARAMETERS = _getenv_bool(
+        "OPENROUTER_REQUIRE_PARAMETERS", "true"
+    )
     OPENROUTER_HTTP_REFERER = _getenv_str_optional("OPENROUTER_HTTP_REFERER")
     OPENROUTER_X_TITLE = _getenv_str_optional("OPENROUTER_X_TITLE")
 

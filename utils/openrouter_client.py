@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -32,6 +32,8 @@ class OpenRouterClient:
         total_timeout: Optional[int] = None,
         http_referer: Optional[str] = None,
         x_title: Optional[str] = None,
+        enable_response_healing: bool = True,
+        require_parameters: bool = True,
     ):
         if not api_key:
             raise ValueError("api_key is required")
@@ -49,6 +51,8 @@ class OpenRouterClient:
         )
         self.http_referer = http_referer
         self.x_title = x_title
+        self.enable_response_healing = enable_response_healing
+        self.require_parameters = require_parameters
 
         self.session = requests.Session()
 
@@ -72,6 +76,8 @@ class OpenRouterClient:
         max_tokens: int = 4096,
         response_format: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
+        plugins: Optional[List[Dict[str, Any]]] = None,
+        provider: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         url = f"{self.base_url}/chat/completions"
         payload: Dict[str, Any] = {
@@ -87,6 +93,14 @@ class OpenRouterClient:
             payload["response_format"] = response_format
         if reasoning_effort is not None:
             payload["reasoning_effort"] = reasoning_effort
+        if plugins is None and self.enable_response_healing:
+            plugins = [{"id": "response-healing"}]
+        if plugins:
+            payload["plugins"] = plugins
+        if provider is None and self.require_parameters:
+            provider = {"require_parameters": True}
+        if provider:
+            payload["provider"] = provider
 
         last_error: Optional[Exception] = None
         started_at = time.monotonic()

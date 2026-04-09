@@ -7,7 +7,7 @@ import sys
 import json
 import time
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from utils.logger import setup_logger
 from utils.pipeline_monitor import PipelineMonitor
@@ -33,6 +33,115 @@ from utils.digest_controller import DigestController, DIGEST_JSON_SCHEMA
 from utils.mailer import GmailSmtpMailer
 from utils.openrouter_client import OpenRouterClient
 from utils.price_cache_manager import PriceCacheManager
+
+
+def _validate_digest_schema(digest_data: Any) -> Optional[str]:
+    """轻量校验 LLM 摘要结构，避免坏数据进入模板。"""
+    if not isinstance(digest_data, dict):
+        return "non_object_json"
+
+    required_fields = {
+        "subject": str,
+        "news_clusters": list,
+        "analysis": dict,
+    }
+    for field, expected_type in required_fields.items():
+        value = digest_data.get(field)
+        if not isinstance(value, expected_type):
+            return "schema_incomplete"
+
+    if not str(digest_data.get("subject", "")).strip():
+        return "schema_incomplete"
+
+    return None
+
+
+def parse_digest_response(resp: Any) -> Dict[str, Any]:
+    """解析 OpenRouter 摘要响应，返回结构化结果和诊断信息。"""
+    meta: Dict[str, Any] = {
+        "finish_reason": None,
+        "native_finish_reason": None,
+        "provider": None,
+        "model": None,
+        "usage": {},
+        "has_refusal": False,
+        "has_reasoning": False,
+        "content_type": None,
+        "content_length": None,
+        "content_preview": "",
+    }
+
+    if not isinstance(resp, dict):
+        return {"digest_data": None, "error_code": "invalid_response", "meta": meta}
+
+    meta["provider"] = resp.get("provider")
+    meta["model"] = resp.get("model")
+    meta["usage"] = resp.get("usage", {}) or {}
+
+    choices = resp.get("choices") or []
+    choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+    message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+
+    meta["finish_reason"] = choice.get("finish_reason")
+    meta["native_finish_reason"] = choice.get("native_finish_reason")
+
+    content = message.get("content")
+    refusal = message.get("refusal")
+    reasoning = message.get("reasoning")
+    reasoning_details = message.get("reasoning_details")
+
+    meta["has_refusal"] = bool(refusal)
+    meta["has_reasoning"] = bool(reasoning or reasoning_details)
+    meta["content_type"] = type(content).__name__
+
+    if isinstance(content, str):
+        stripped_content = content.strip()
+        meta["content_length"] = len(content)
+        meta["content_preview"] = stripped_content[:400]
+        if not stripped_content:
+            error_code = "refusal_or_empty" if meta["has_refusal"] else "empty_content"
+            return {"digest_data": None, "error_code": error_code, "meta": meta}
+
+        try:
+            digest_data = json.loads(stripped_content)
+        except json.JSONDecodeError:
+            return {
+                "digest_data": None,
+                "error_code": "json_decode_error",
+                "meta": meta,
+            }
+    elif content is None:
+        error_code = "refusal_or_empty" if meta["has_refusal"] else "empty_content"
+        return {"digest_data": None, "error_code": error_code, "meta": meta}
+    else:
+        meta["content_preview"] = repr(content)[:400]
+        return {
+            "digest_data": None,
+            "error_code": "unsupported_content_type",
+            "meta": meta,
+        }
+
+    schema_error = _validate_digest_schema(digest_data)
+    if schema_error:
+        return {"digest_data": None, "error_code": schema_error, "meta": meta}
+
+    return {"digest_data": digest_data, "error_code": None, "meta": meta}
+
+
+def build_llm_fallback_subject(base_subject: str, error_code: str) -> str:
+    """构建带原因码的 fallback 标题。"""
+    return f"{base_subject} [fallback:{error_code}]"
+
+
+def build_llm_fallback_email_html(market_signal, error_code: str) -> str:
+    """构建 LLM 解析失败时的 HTML 备用邮件。"""
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0; padding:16px; background-color:#f0f2f5; font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif; color:#334155;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px; margin:0 auto; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+<tr><td style="padding:16px 18px; border-bottom:2px solid #ca8a04;"><h1 style="margin:0; font-size:20px; color:#0f172a;">FinNews 邮件生成失败</h1><p style="margin:8px 0 0 0; font-size:13px; color:#64748b;">时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p></td></tr>
+<tr><td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#475569;"><p style="margin:0 0 10px 0;">LLM 未能生成有效的数据。</p><p style="margin:0 0 10px 0;">原因码: <code style="background:#f8fafc; padding:2px 6px; border-radius:6px;">{error_code}</code></p><p style="margin:0 0 8px 0; font-weight:600; color:#0f172a;">规则引擎信号</p><ul style="margin:0; padding-left:20px;"><li>VIX: {market_signal.vix_value or "N/A"}</li><li>警报级别: {market_signal.vix_alert_level.value}</li><li>宏观倾向: {market_signal.macro_bias.value}</li></ul></td></tr>
+</table>
+</body></html>"""
 
 
 def send_email_with_retry(
@@ -518,6 +627,8 @@ def main():
             max_retries=Config.OPENROUTER_MAX_RETRIES,
             http_referer=Config.OPENROUTER_HTTP_REFERER,
             x_title=Config.OPENROUTER_X_TITLE,
+            enable_response_healing=Config.OPENROUTER_ENABLE_RESPONSE_HEALING,
+            require_parameters=Config.OPENROUTER_REQUIRE_PARAMETERS,
         )
 
         logger.info(
@@ -565,23 +676,10 @@ def main():
                 reasoning_effort=Config.OPENROUTER_REASONING_EFFORT,
             )
 
-            # 解析LLM响应
-            content = (
-                resp.get("choices", [{}])[0].get("message", {}).get("content")
-                if isinstance(resp, dict)
-                else None
-            )
-
-            digest_data = None
-            if isinstance(content, str):
-                try:
-                    digest_data = json.loads(content)
-                    logger.debug(
-                        f"LLM返回数据: subject={digest_data.get('subject', 'N/A')[:50]}, "
-                        f"news_clusters={len(digest_data.get('news_clusters', []))}"
-                    )
-                except json.JSONDecodeError as e:
-                    logger.error(f"LLM响应JSON解析失败: {e}")
+            parsed = parse_digest_response(resp)
+            digest_data = parsed["digest_data"]
+            parse_error_code = parsed["error_code"]
+            parse_meta = parsed["meta"]
 
             # 使用模板渲染HTML
             if isinstance(digest_data, dict):
@@ -591,6 +689,18 @@ def main():
                     signal=market_signal,
                     data=multi_window_data,
                     comex_signal=comex_signal,
+                )
+                usage = parse_meta.get("usage", {})
+                completion_tokens = usage.get("completion_tokens")
+                reasoning_tokens = (
+                    usage.get("completion_tokens_details", {}) or {}
+                ).get("reasoning_tokens")
+                logger.info(
+                    "LLM摘要解析成功: subject=%s, news_clusters=%s, completion_tokens=%s, reasoning_tokens=%s",
+                    email_subject[:80],
+                    len(digest_data.get("news_clusters", [])),
+                    completion_tokens,
+                    reasoning_tokens,
                 )
             else:
                 email_subject = ""
@@ -602,14 +712,24 @@ def main():
                 email_subject = digest_controller.get_email_subject(market_signal)
 
             if not email_html:
-                logger.warning("LLM数据解析失败，使用备用邮件内容")
-                email_html = f"""<!DOCTYPE html>
-<html><body style="margin:0; padding:16px; background-color:#f0f2f5; font-family:'IBM Plex Sans','Segoe UI',Arial,sans-serif; color:#334155;">
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px; margin:0 auto; background-color:#ffffff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
-<tr><td style="padding:16px 18px; border-bottom:2px solid #ca8a04;"><h1 style="margin:0; font-size:20px; color:#0f172a;">FinNews 邮件生成失败</h1><p style="margin:8px 0 0 0; font-size:13px; color:#64748b;">时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p></td></tr>
-<tr><td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#475569;"><p style="margin:0 0 10px 0;">LLM 未能生成有效的数据。</p><p style="margin:0 0 8px 0; font-weight:600; color:#0f172a;">规则引擎信号</p><ul style="margin:0; padding-left:20px;"><li>VIX: {market_signal.vix_value or "N/A"}</li><li>警报级别: {market_signal.vix_alert_level.value}</li><li>宏观倾向: {market_signal.macro_bias.value}</li></ul></td></tr>
-</table>
-</body></html>"""
+                failure_code = parse_error_code or "render_failed"
+                logger.warning(
+                    "LLM数据解析失败，使用备用邮件内容: reason=%s, content_type=%s, content_length=%s, finish_reason=%s, native_finish_reason=%s, has_refusal=%s, has_reasoning=%s, provider=%s, model=%s, preview=%s",
+                    failure_code,
+                    parse_meta.get("content_type"),
+                    parse_meta.get("content_length"),
+                    parse_meta.get("finish_reason"),
+                    parse_meta.get("native_finish_reason"),
+                    parse_meta.get("has_refusal"),
+                    parse_meta.get("has_reasoning"),
+                    parse_meta.get("provider"),
+                    parse_meta.get("model"),
+                    parse_meta.get("content_preview"),
+                )
+                email_subject = build_llm_fallback_subject(email_subject, failure_code)
+                email_html = build_llm_fallback_email_html(
+                    market_signal, failure_code
+                )
                 email_images = None  # 备用模式无图片
 
             logger.info(f"✅ 邮件生成完成: {email_subject[:50]}...")

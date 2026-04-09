@@ -6,6 +6,7 @@ import json
 import pytest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from utils.digest_controller import DigestController
 from utils.openrouter_client import OpenRouterClient
@@ -17,16 +18,21 @@ from models.analysis import ComexSignal, ComexAlertLevel
 
 FAKE_DIGEST = {
     "subject": "【黄金白银】市场观察日报",
-    "key_news": [
+    "news_clusters": [
         {
-            "title": "黄金价格在美联储信号前保持稳定",
-            "source": "Reuters",
-            "summary": "黄金在等待联储官员讲话期间基本持平。",
-            "url": "https://example.com/1",
-            "impact_tag": "#Neutral",
+            "cluster_title": "黄金价格在联储信号前保持稳定",
+            "cluster_summary": "黄金在等待联储官员讲话期间基本持平，市场情绪偏观望。",
+            "impact_tag": "Neutral",
+            "sources": [
+                {
+                    "title": "黄金价格在美联储信号前保持稳定",
+                    "source": "Reuters",
+                    "url": "https://example.com/1",
+                    "timestamp": "10:20",
+                }
+            ],
         }
     ],
-    "other_news": [],
     "analysis": {
         "market_sentiment": "谨慎",
         "price_outlook": "中性偏多",
@@ -67,18 +73,18 @@ SAMPLE_RECORDS = [
 
 
 @pytest.fixture
-def mock_openrouter(mocker):
+def mock_openrouter(monkeypatch):
     """mock OpenRouter API 返回预构造 JSON"""
-    mock_response = mocker.MagicMock()
+    mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "choices": [{"message": {"content": json.dumps(FAKE_DIGEST), "role": "assistant"}}]
     }
-    mock_response.raise_for_status = mocker.MagicMock()
+    mock_response.raise_for_status = MagicMock()
 
-    mock_session = mocker.MagicMock()
+    mock_session = MagicMock()
     mock_session.post.return_value = mock_response
-    mocker.patch("utils.openrouter_client.requests.Session", return_value=mock_session)
+    monkeypatch.setattr("utils.openrouter_client.requests.Session", lambda: mock_session)
     return mock_session
 
 
