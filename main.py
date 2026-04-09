@@ -56,6 +56,22 @@ def _validate_digest_schema(digest_data: Any) -> Optional[str]:
     return None
 
 
+def _preview_debug_value(value: Any, limit: int = 400) -> str:
+    """将调试值压缩成短字符串，避免日志过长。"""
+    if value is None:
+        return ""
+
+    if isinstance(value, str):
+        return value.strip()[:limit]
+
+    try:
+        serialized = json.dumps(value, ensure_ascii=False, default=str)
+    except TypeError:
+        serialized = repr(value)
+
+    return serialized[:limit]
+
+
 def parse_digest_response(resp: Any) -> Dict[str, Any]:
     """解析 OpenRouter 摘要响应，返回结构化结果和诊断信息。"""
     meta: Dict[str, Any] = {
@@ -69,6 +85,13 @@ def parse_digest_response(resp: Any) -> Dict[str, Any]:
         "content_type": None,
         "content_length": None,
         "content_preview": "",
+        "choice_keys": [],
+        "message_keys": [],
+        "tool_calls_count": 0,
+        "reasoning_preview": "",
+        "reasoning_details_preview": "",
+        "raw_choice_preview": "",
+        "raw_message_preview": "",
     }
 
     if not isinstance(resp, dict):
@@ -82,6 +105,11 @@ def parse_digest_response(resp: Any) -> Dict[str, Any]:
     choice = choices[0] if choices and isinstance(choices[0], dict) else {}
     message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
 
+    meta["choice_keys"] = sorted(choice.keys())
+    meta["message_keys"] = sorted(message.keys())
+    meta["raw_choice_preview"] = _preview_debug_value(choice)
+    meta["raw_message_preview"] = _preview_debug_value(message)
+
     meta["finish_reason"] = choice.get("finish_reason")
     meta["native_finish_reason"] = choice.get("native_finish_reason")
 
@@ -89,10 +117,14 @@ def parse_digest_response(resp: Any) -> Dict[str, Any]:
     refusal = message.get("refusal")
     reasoning = message.get("reasoning")
     reasoning_details = message.get("reasoning_details")
+    tool_calls = message.get("tool_calls")
 
     meta["has_refusal"] = bool(refusal)
     meta["has_reasoning"] = bool(reasoning or reasoning_details)
     meta["content_type"] = type(content).__name__
+    meta["tool_calls_count"] = len(tool_calls) if isinstance(tool_calls, list) else 0
+    meta["reasoning_preview"] = _preview_debug_value(reasoning)
+    meta["reasoning_details_preview"] = _preview_debug_value(reasoning_details)
 
     if isinstance(content, str):
         stripped_content = content.strip()
@@ -714,7 +746,7 @@ def main():
             if not email_html:
                 failure_code = parse_error_code or "render_failed"
                 logger.warning(
-                    "LLM数据解析失败，使用备用邮件内容: reason=%s, content_type=%s, content_length=%s, finish_reason=%s, native_finish_reason=%s, has_refusal=%s, has_reasoning=%s, provider=%s, model=%s, preview=%s",
+                    "LLM数据解析失败，使用备用邮件内容: reason=%s, content_type=%s, content_length=%s, finish_reason=%s, native_finish_reason=%s, has_refusal=%s, has_reasoning=%s, tool_calls_count=%s, provider=%s, model=%s, choice_keys=%s, message_keys=%s, preview=%s, reasoning_preview=%s, reasoning_details_preview=%s, raw_message_preview=%s, raw_choice_preview=%s",
                     failure_code,
                     parse_meta.get("content_type"),
                     parse_meta.get("content_length"),
@@ -722,14 +754,19 @@ def main():
                     parse_meta.get("native_finish_reason"),
                     parse_meta.get("has_refusal"),
                     parse_meta.get("has_reasoning"),
+                    parse_meta.get("tool_calls_count"),
                     parse_meta.get("provider"),
                     parse_meta.get("model"),
+                    parse_meta.get("choice_keys"),
+                    parse_meta.get("message_keys"),
                     parse_meta.get("content_preview"),
+                    parse_meta.get("reasoning_preview"),
+                    parse_meta.get("reasoning_details_preview"),
+                    parse_meta.get("raw_message_preview"),
+                    parse_meta.get("raw_choice_preview"),
                 )
                 email_subject = build_llm_fallback_subject(email_subject, failure_code)
-                email_html = build_llm_fallback_email_html(
-                    market_signal, failure_code
-                )
+                email_html = build_llm_fallback_email_html(market_signal, failure_code)
                 email_images = None  # 备用模式无图片
 
             logger.info(f"✅ 邮件生成完成: {email_subject[:50]}...")
